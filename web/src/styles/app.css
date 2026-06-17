@@ -297,7 +297,7 @@ h1 {
 
 .board-toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto auto minmax(120px, auto);
+  grid-template-columns: minmax(260px, 1fr) auto auto auto minmax(120px, auto);
   gap: 12px;
   margin-bottom: 12px;
   align-items: center;
@@ -1348,7 +1348,7 @@ body.is-resizing-panel {
   }
 
   .board-toolbar {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr auto auto;
   }
 
   .facet-trigger {

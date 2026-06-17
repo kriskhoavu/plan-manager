@@ -103,7 +103,6 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
           <h1>{repository?.name ?? 'Kanban'}</h1>
           <span>{repository ? `${repository.baselineBranch} workspace` : 'No workspace selected'}</span>
         </div>
-        <span className="readonly-badge"><LockKeyhole size={15} /> Read-only</span>
       </div>
       <div className="board-toolbar">
         <label className="filter-input plan-search">
@@ -116,6 +115,7 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
         <button className="secondary" onClick={clearFilters} disabled={activeFilterCount === 0}>
           <X size={16} /> Clear
         </button>
+        <span className="readonly-badge"><LockKeyhole size={15} /> Read-only</span>
         <span className="scan-state">{scanState}</span>
       </div>
       <div className="facet-bar">
