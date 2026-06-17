@@ -48,10 +48,10 @@ Avoid:
 
 **Deliverables:**
 
-- [ ] Add request and response models for file save, metadata save, status update, new plan, Git status, commit, and branch operations.
-- [ ] Add Git change models for dirty, staged, untracked, conflicted, ahead, behind, and upstream state.
-- [ ] Add validation helpers for editable status values, branch names, commit messages, service names, and ticket names.
-- [ ] Add tests for validation rules.
+- [x] Add request and response models for file save, metadata save, status update, new plan, Git status, commit, and branch operations.
+- [x] Add Git change models for dirty, staged, untracked, conflicted, ahead, behind, and upstream state.
+- [x] Add validation helpers for editable status values, branch names, commit messages, service names, and ticket names.
+- [x] Add tests for validation rules.
 
 **Verification:** `rtk go test ./...`
 
