@@ -44,6 +44,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   const [diff, setDiff] = useState('');
   const [diffMode, setDiffMode] = useState<DiffMode>('review');
   const [revertingFile, setRevertingFile] = useState(false);
+  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('preview');
   const [error, setError] = useState('');
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -256,8 +257,6 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
 
   const revertFile = async () => {
     if (!file || !plan) return;
-    if (dirtyFile && !window.confirm('Discard unsaved editor changes and revert this file?')) return;
-    if (!dirtyFile && !window.confirm(`Revert ${file.path} to HEAD?`)) return;
     setRevertingFile(true);
     setError('');
     try {
@@ -273,6 +272,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
       setError(err instanceof Error ? err.message : 'Revert failed');
     } finally {
       setRevertingFile(false);
+      setRevertDialogOpen(false);
     }
   };
 
@@ -356,7 +356,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
               selectedFileHasDiff={selectedFileHasDiff}
               reverting={revertingFile}
               onModeChange={setDiffMode}
-              onRevertFile={revertFile}
+              onRevertFile={() => setRevertDialogOpen(true)}
             />
           )}
         </div>
@@ -457,6 +457,17 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
           )}
         </aside>
       </div>
+      {revertDialogOpen && file && (
+        <ConfirmDialog
+          title="Revert file"
+          message={dirtyFile ? `Discard unsaved editor changes and revert ${file.path} to HEAD?` : `Revert ${file.path} to HEAD?`}
+          confirmLabel={revertingFile ? 'Reverting...' : 'Revert File'}
+          busy={revertingFile}
+          danger
+          onCancel={() => setRevertDialogOpen(false)}
+          onConfirm={revertFile}
+        />
+      )}
     </section>
   );
 }
@@ -525,6 +536,40 @@ function DiffPanel({ diff, files, mode, selectedPath, selectedFileHasDiff, rever
         </div>
       )}
     </section>
+  );
+}
+
+function ConfirmDialog({ title, message, confirmLabel, busy, danger, onCancel, onConfirm }: {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  busy?: boolean;
+  danger?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !busy) onCancel();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [busy, onCancel]);
+
+  return (
+    <div className="confirm-backdrop" role="presentation">
+      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <header>
+          <h2 id="confirm-title">{title}</h2>
+          <button className="icon-button" type="button" aria-label="Close dialog" disabled={busy} onClick={onCancel}>×</button>
+        </header>
+        <p>{message}</p>
+        <footer>
+          <button className="ghost" type="button" disabled={busy} onClick={onCancel}>Cancel</button>
+          <button className={danger ? 'danger-confirm' : 'primary'} type="button" disabled={busy} onClick={onConfirm}>{confirmLabel}</button>
+        </footer>
+      </section>
+    </div>
   );
 }
 
