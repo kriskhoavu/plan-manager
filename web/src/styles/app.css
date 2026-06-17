@@ -278,16 +278,19 @@ select {
   min-width: 0;
 }
 
-.title-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
-  color: var(--blue);
+.kanban-heading h1,
+.kanban-heading span {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.kanban-heading h1 svg {
+  color: var(--blue);
+}
+
+.kanban-heading > div > span svg {
+  color: var(--muted);
 }
 
 .workspace-context {

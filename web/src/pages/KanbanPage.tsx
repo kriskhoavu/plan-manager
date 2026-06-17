@@ -103,10 +103,9 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
     <section className="kanban-page">
       <div className="page-title kanban-title">
         <div className="kanban-heading">
-          <span className="title-icon"><KanbanSquare size={18} /></span>
           <div>
-            <h1>Kanban board</h1>
-            <span>{repository?.name ?? 'No workspace selected'}</span>
+            <h1><KanbanSquare size={22} /> Kanban board</h1>
+            <span><FolderGit2 size={15} /> {repository?.name ?? 'No workspace selected'}</span>
           </div>
         </div>
         {repository && (
