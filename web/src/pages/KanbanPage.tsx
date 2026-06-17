@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Filter, FolderGit2, KanbanSquare, LockKeyhole, RotateCw, Search, X } from 'lucide-react';
+import type { CSSProperties, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
+import { ChevronDown, Code2, FileText, Filter, FolderGit2, GripVertical, Info, KanbanSquare, LockKeyhole, RefreshCw, RotateCw, Search, X } from 'lucide-react';
+import { marked } from 'marked';
 import { api, statusLabels, statusOrder } from '../lib/api';
-import type { PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
+import type { FileContent, FileNode, PlanDetail, PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
 
 type FilterKey = 'sources' | 'statuses' | 'branches' | 'authors';
 
 type Filters = Record<FilterKey, string[]>;
 
 type FacetOption = { value: string; label: string };
+
+type DrawerTab = 'preview' | 'raw' | 'diff';
 
 const emptyFilters: Filters = {
   sources: [],
@@ -29,6 +33,7 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
   const [error, setError] = useState('');
   const [scanState, setScanState] = useState('');
   const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
+  const [drawerPlanId, setDrawerPlanId] = useState('');
   const text = query;
 
   useEffect(() => {
@@ -160,12 +165,28 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
             </header>
             <div className="card-stack">
               {loading && Array.from({ length: 3 }).map((_, index) => <div className="plan-card skeleton" key={index} />)}
-              {!loading && grouped.get(column)?.map((plan) => <PlanCard key={plan.id} plan={plan} repository={repository} onOpen={() => onOpenPlan(plan.id)} />)}
+              {!loading && grouped.get(column)?.map((plan) => (
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  repository={repository}
+                  onPreview={() => setDrawerPlanId(plan.id)}
+                  onOpen={() => onOpenPlan(plan.id)}
+                />
+              ))}
               {!loading && (grouped.get(column)?.length ?? 0) === 0 && <div className="column-empty">No plans</div>}
             </div>
           </div>
         ))}
       </div>
+      {drawerPlanId && (
+        <PlanPreviewDrawer
+          planId={drawerPlanId}
+          refreshKey={refreshKey}
+          onClose={() => setDrawerPlanId('')}
+          onOpenFull={() => onOpenPlan(drawerPlanId)}
+        />
+      )}
     </section>
   );
 }
@@ -252,16 +273,26 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
   );
 }
 
-function PlanCard({ plan, repository, onOpen }: { plan: PlanSummary; repository?: RepositoryConfig; onOpen: () => void }) {
+function PlanCard({ plan, repository, onPreview, onOpen }: { plan: PlanSummary; repository?: RepositoryConfig; onPreview: () => void; onOpen: () => void }) {
   const source = sourceLabel(plan, repository);
   const docs = source === 'docs';
+  const navigate = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpen();
+  };
   return (
-    <button className={docs ? 'plan-card docs-plan' : 'plan-card'} onClick={onOpen}>
+    <article className={docs ? 'plan-card docs-plan' : 'plan-card'} onClick={onPreview} role="button" tabIndex={0} onKeyDown={(event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onPreview();
+      }
+    }}>
       <div className="plan-card-title">
-        <strong>{plan.title}</strong>
+        <button type="button" className="plan-card-link plan-card-heading" onClick={navigate}>{plan.title}</button>
         {source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
       </div>
       <span>{plan.service} / {plan.branch}</span>
+      <button type="button" className="plan-card-link plan-card-ticket" onClick={navigate}>{plan.ticket}</button>
       <p>{plan.description || plan.ticket}</p>
       <footer>
         <span className="avatar">{(plan.author || plan.owner || '?').slice(0, 1).toUpperCase()}</span>
@@ -269,7 +300,140 @@ function PlanCard({ plan, repository, onOpen }: { plan: PlanSummary; repository?
         <time>{plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : 'No date'}</time>
       </footer>
       {plan.tags.length > 0 && <div className="tags">{plan.tags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}</div>}
-    </button>
+    </article>
+  );
+}
+
+function PlanPreviewDrawer({ planId, refreshKey, onClose, onOpenFull }: { planId: string; refreshKey: number; onClose: () => void; onOpenFull: () => void }) {
+  const [plan, setPlan] = useState<PlanDetail | null>(null);
+  const [files, setFiles] = useState<FileNode[]>([]);
+  const [file, setFile] = useState<FileContent | null>(null);
+  const [diff, setDiff] = useState('');
+  const [tab, setTab] = useState<DrawerTab>('preview');
+  const [error, setError] = useState('');
+  const [width, setWidth] = useState(560);
+  const drawerStyle = { '--drawer-width': `${width}px` } as CSSProperties & Record<'--drawer-width', string>;
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [onClose]);
+
+  useEffect(() => {
+    let active = true;
+    setPlan(null);
+    setFile(null);
+    setFiles([]);
+    setDiff('');
+    setError('');
+    api.plan(planId).then((payload) => {
+      if (active) setPlan(payload);
+    }).catch((err: Error) => {
+      if (active) setError(err.message);
+    });
+    api.files(planId).then(async (tree) => {
+      if (!active) return;
+      setFiles(tree);
+      const first = firstFile(tree);
+      if (first) {
+        try {
+          const content = await api.file(planId, first.id);
+          if (active) setFile(content);
+        } catch (err) {
+          if (active) setError(err instanceof Error ? err.message : 'File failed to load');
+        }
+      }
+    }).catch((err: Error) => {
+      if (active) setError(err.message);
+    });
+    api.diff(planId).then((payload) => {
+      if (active) setDiff(payload.diff || 'No local changes.');
+    }).catch(() => {
+      if (active) setDiff('No diff available.');
+    });
+    return () => {
+      active = false;
+    };
+  }, [planId, refreshKey]);
+
+  const preview = useMemo(() => ({ __html: marked.parse(file?.content ?? '') as string }), [file]);
+
+  const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startingWidth = width;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const delta = startX - moveEvent.clientX;
+      setWidth(Math.min(920, Math.max(420, startingWidth + delta)));
+    };
+
+    const onPointerUp = () => {
+      document.body.classList.remove('is-resizing-drawer');
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+
+    document.body.classList.add('is-resizing-drawer');
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp, { once: true });
+  };
+
+  return (
+    <>
+      <button className="drawer-scrim" type="button" aria-label="Close preview" onClick={onClose} />
+      <aside className="plan-drawer" style={drawerStyle} aria-label="Plan preview">
+        <button className="drawer-resize-handle" type="button" aria-label="Resize preview panel" onPointerDown={startResize}>
+          <GripVertical size={16} />
+        </button>
+        <header className="plan-drawer-header">
+          <div>
+            <span className="drawer-kicker">{plan?.ticket ?? 'Loading'}</span>
+            <h2>{plan?.title ?? 'Loading plan'}</h2>
+            <p>{plan ? `${plan.service} / ${plan.branch}` : ''}</p>
+          </div>
+          <div className="drawer-actions">
+            <button type="button" className="secondary" onClick={onOpenFull}>Open details</button>
+            <button type="button" className="icon-button" aria-label="Close preview" onClick={onClose}><X size={16} /></button>
+          </div>
+        </header>
+        {error && <p className="error drawer-error">{error}</p>}
+        <div className="plan-drawer-body">
+          <section className="drawer-main">
+            {plan?.description && (
+              <section className="drawer-section">
+                <h3>Description</h3>
+                <p>{plan.description}</p>
+              </section>
+            )}
+            <section className="drawer-section">
+              <div className="drawer-tabs">
+                <button className={tab === 'preview' ? 'active' : ''} type="button" onClick={() => setTab('preview')}><FileText size={15} /> Preview</button>
+                <button className={tab === 'raw' ? 'active' : ''} type="button" onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
+                <button className={tab === 'diff' ? 'active' : ''} type="button" onClick={() => setTab('diff')}><RefreshCw size={15} /> Diff</button>
+              </div>
+              {tab === 'preview' && (file ? <article className="drawer-markdown" dangerouslySetInnerHTML={preview} /> : <div className="drawer-empty">No readable file selected.</div>)}
+              {tab === 'raw' && <pre className="drawer-raw">{file?.content ?? 'No readable file selected.'}</pre>}
+              {tab === 'diff' && <pre className="drawer-raw">{diff || 'Loading diff...'}</pre>}
+            </section>
+          </section>
+          <aside className="drawer-meta">
+            <h3><Info size={15} /> Details</h3>
+            <dl>
+              <dt>Repository</dt><dd>{plan?.repositoryName ?? '-'}</dd>
+              <dt>Status</dt><dd>{plan?.status ?? '-'}</dd>
+              <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
+              <dt>Source</dt><dd>{metadataSourceLabel(plan?.metadataSource)}</dd>
+              <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
+            </dl>
+            {(plan?.tags?.length ?? 0) > 0 && <div className="tags">{plan?.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}
+          </aside>
+        </div>
+      </aside>
+    </>
   );
 }
 
@@ -320,6 +484,19 @@ function planSearchText(plan: PlanSummary): string {
     plan.metadataSource,
     ...plan.tags
   ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function firstFile(nodes: FileNode[]): FileNode | null {
+  for (const node of nodes) {
+    if (node.type === 'file') return node;
+    const child = firstFile(node.children ?? []);
+    if (child) return child;
+  }
+  return null;
+}
+
+function metadataSourceLabel(source?: string): string {
+  return source === 'docs' ? 'Docs' : 'Plan';
 }
 
 function unique(values: string[]): string[] {
