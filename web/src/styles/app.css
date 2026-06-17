@@ -1595,7 +1595,10 @@ body.is-resizing-drawer {
 }
 
 .workspace-page {
-  min-height: calc(100vh - 96px);
+  height: calc(100vh - 118px);
+  min-height: 680px;
+  display: flex;
+  flex-direction: column;
 }
 
 .workspace-header {
@@ -1615,10 +1618,12 @@ body.is-resizing-drawer {
 }
 
 .workspace-grid {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: var(--left-panel-width, 300px) minmax(0, 1fr) var(--right-panel-width, 300px);
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
   transition: grid-template-columns 180ms ease;
 }
 
@@ -1629,14 +1634,21 @@ body.is-resizing-drawer {
   border: 1px solid var(--line);
   border-radius: 8px;
   min-width: 0;
+  min-height: 0;
 }
 
 .file-tree,
 .metadata-panel {
   padding: 14px;
   position: relative;
-  min-height: 640px;
+  overflow: auto;
   transition: padding 180ms ease, min-height 180ms ease;
+}
+
+.document-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .side-panel.collapsed {
@@ -1815,11 +1827,21 @@ body.is-resizing-panel {
 
 .tabs {
   height: 48px;
+  flex: none;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
   padding: 0 10px;
   border-bottom: 1px solid var(--line);
+}
+
+.tab-list {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
 }
 
 .tabs button {
@@ -1834,7 +1856,13 @@ body.is-resizing-panel {
   gap: 6px;
 }
 
-.tabs button.active {
+.save-file-tab-action {
+  flex: none;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.tab-list button.active {
   background: var(--panel-soft);
   color: var(--blue);
 }
@@ -1842,9 +1870,10 @@ body.is-resizing-panel {
 .markdown-preview,
 .raw-markdown,
 .diff-view {
+  flex: 1;
+  min-height: 0;
   padding: 24px;
   margin: 0;
-  min-height: 620px;
   overflow: auto;
 }
 
@@ -1853,7 +1882,8 @@ body.is-resizing-panel {
 }
 
 .document-empty {
-  min-height: 620px;
+  flex: 1;
+  min-height: 0;
   display: grid;
   align-content: center;
   justify-items: center;
@@ -1892,11 +1922,12 @@ body.is-resizing-panel {
 }
 
 .raw-editor {
+  flex: 1;
   width: 100%;
-  min-height: 620px;
+  min-height: 0;
   border: 0;
   border-radius: 0;
-  resize: vertical;
+  resize: none;
   outline: 0;
   padding: 24px;
   background: color-mix(in srgb, var(--panel) 92%, var(--panel-soft));

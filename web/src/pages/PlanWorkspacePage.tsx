@@ -286,9 +286,14 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
         </aside>
         <div className="document-panel">
           <div className="tabs">
-            <button className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}><FileText size={15} /> Preview</button>
-            <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
-            <button className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}><GitCompare size={15} /> Diff</button>
+            <div className="tab-list">
+              <button className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}><FileText size={15} /> Preview</button>
+              <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
+              <button className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}><GitCompare size={15} /> Diff</button>
+            </div>
+            <button className="primary save-file-tab-action" type="button" disabled={!dirtyFile || savingFile} onClick={saveFile}>
+              {savingFile ? 'Saving...' : 'Save File'}
+            </button>
           </div>
           {dirty && <div className="edit-state-banner">Unsaved changes</div>}
           {tab === 'preview' && (file ? <article className="markdown-preview" dangerouslySetInnerHTML={preview} /> : <EmptyDocumentState hasFiles={hasFiles} />)}
@@ -345,7 +350,6 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
                 </div>
               )}
               <div className="workspace-actions">
-                <button className="primary" type="button" disabled={!dirtyFile || savingFile} onClick={saveFile}>{savingFile ? 'Saving...' : 'Save File'}</button>
                 <button className="secondary" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
               </div>
               {gitStatus && (
