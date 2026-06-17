@@ -113,13 +113,14 @@
    - In Progress
    - Review
    - Done
-4. Developer filters by branch, status, author, and text.
+4. Developer filters by source root, branch, status, author, and text.
 5. Developer selects multiple statuses or authors in one filter.
 
 ## Expected Result
 
 - Board layout follows `specs/design.png`.
 - The board does not mix plans from other registered repositories.
+- Plans from different configured roots, such as `plans` and `docs`, can be filtered independently.
 - Cards show title, repository or service, branch, author when known, and updated time.
 - Filters update the visible cards without a full page reload.
 - Multiple selections in one filter are OR-matched.

@@ -32,6 +32,7 @@ export interface PlanSummary {
   updatedAt?: string;
   description?: string;
   metadataSource: string;
+  planRoot?: string;
 }
 
 export interface PlanDocument {

@@ -18,7 +18,8 @@ describe('KanbanPage', () => {
           title: 'Plan Manager',
           status: 'draft',
           tags: ['readonly'],
-          metadataSource: 'plan.yaml'
+          metadataSource: 'plan.yaml',
+          planRoot: 'plans/platform/PM-001'
         }
       ]
     }));
@@ -44,7 +45,8 @@ describe('filterPlans', () => {
       status: 'draft',
       author: 'Khoa',
       tags: [],
-      metadataSource: 'plan.yaml'
+      metadataSource: 'plan.yaml',
+      planRoot: 'plans/api/DI-1'
     },
     {
       id: 'p2',
@@ -57,17 +59,19 @@ describe('filterPlans', () => {
       status: 'done',
       author: 'Giang',
       tags: ['docs'],
-      metadataSource: 'docs'
+      metadataSource: 'docs',
+      planRoot: 'docs'
     }
   ];
+  const repository = { id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', planDirectories: ['plans', 'docs'], createdAt: new Date().toISOString() };
 
   it('uses OR within a facet', () => {
-    const result = filterPlans(plans, { statuses: [], branches: [], authors: [] }, '');
+    const result = filterPlans(plans, { sources: ['plans', 'docs'], statuses: [], branches: [], authors: [] }, '', repository);
     expect(result.map((plan) => plan.id)).toEqual(['p1', 'p2']);
   });
 
   it('uses AND across facets', () => {
-    const result = filterPlans(plans, { statuses: ['done'], branches: [], authors: ['Giang'] }, '');
+    const result = filterPlans(plans, { sources: ['docs'], statuses: ['done'], branches: [], authors: ['Giang'] }, '', repository);
     expect(result.map((plan) => plan.id)).toEqual(['p2']);
   });
 });

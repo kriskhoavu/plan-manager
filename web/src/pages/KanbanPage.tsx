@@ -3,13 +3,14 @@ import { ChevronDown, Filter, LockKeyhole, RotateCw, Search, X } from 'lucide-re
 import { api, statusLabels, statusOrder } from '../lib/api';
 import type { PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
 
-type FilterKey = 'statuses' | 'branches' | 'authors';
+type FilterKey = 'sources' | 'statuses' | 'branches' | 'authors';
 
 type Filters = Record<FilterKey, string[]>;
 
 type FacetOption = { value: string; label: string };
 
 const emptyFilters: Filters = {
+  sources: [],
   statuses: [],
   branches: [],
   authors: []
@@ -43,10 +44,12 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
       .finally(() => setLoading(false));
   }, [repository, refreshKey]);
 
-  const filteredPlans = useMemo(() => filterPlans(plans, filters, text), [plans, filters, text]);
+  const sourceOptions = useMemo(() => sourceFacetOptions(plans, repository), [plans, repository]);
+  const filteredPlans = useMemo(() => filterPlans(plans, filters, text, repository), [plans, filters, text, repository]);
   const branches = useMemo(() => unique(plans.map((plan) => plan.branch)), [plans]);
   const authors = useMemo(() => unique(plans.map((plan) => plan.author || plan.owner || 'Unknown')), [plans]);
   const facetConfig: { key: FilterKey; title: string; options: FacetOption[] }[] = [
+    { key: 'sources', title: 'Source', options: sourceOptions },
     { key: 'statuses', title: 'Status', options: statusOrder.map((item) => ({ value: item, label: statusLabels[item] })) },
     { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) },
     { key: 'branches', title: 'Branches', options: branches.map((branch) => ({ value: branch, label: branch })) }
@@ -148,7 +151,7 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
             </header>
             <div className="card-stack">
               {loading && Array.from({ length: 3 }).map((_, index) => <div className="plan-card skeleton" key={index} />)}
-              {!loading && grouped.get(column)?.map((plan) => <PlanCard key={plan.id} plan={plan} onOpen={() => onOpenPlan(plan.id)} />)}
+              {!loading && grouped.get(column)?.map((plan) => <PlanCard key={plan.id} plan={plan} repository={repository} onOpen={() => onOpenPlan(plan.id)} />)}
               {!loading && (grouped.get(column)?.length ?? 0) === 0 && <div className="column-empty">No plans</div>}
             </div>
           </div>
@@ -240,13 +243,14 @@ function SelectedFilters({ facets, filters, onRemove }: { facets: { key: FilterK
   );
 }
 
-function PlanCard({ plan, onOpen }: { plan: PlanSummary; onOpen: () => void }) {
-  const docs = plan.metadataSource === 'docs';
+function PlanCard({ plan, repository, onOpen }: { plan: PlanSummary; repository?: RepositoryConfig; onOpen: () => void }) {
+  const source = sourceLabel(plan, repository);
+  const docs = source === 'docs';
   return (
     <button className={docs ? 'plan-card docs-plan' : 'plan-card'} onClick={onOpen}>
       <div className="plan-card-title">
         <strong>{plan.title}</strong>
-        {docs && <span className="metadata-badge docs">Docs</span>}
+        {source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
       </div>
       <span>{plan.service} / {plan.branch}</span>
       <p>{plan.description || plan.ticket}</p>
@@ -260,9 +264,10 @@ function PlanCard({ plan, onOpen }: { plan: PlanSummary; onOpen: () => void }) {
   );
 }
 
-export function filterPlans(plans: PlanSummary[], filters: Filters, text: string): PlanSummary[] {
+export function filterPlans(plans: PlanSummary[], filters: Filters, text: string, repository?: RepositoryConfig): PlanSummary[] {
   const query = text.trim().toLowerCase();
   return plans.filter((plan) => {
+    if (filters.sources.length > 0 && !filters.sources.includes(sourceRoot(plan, repository))) return false;
     if (filters.statuses.length > 0 && !filters.statuses.includes(plan.status)) return false;
     if (filters.branches.length > 0 && !filters.branches.includes(plan.branch)) return false;
     const author = plan.author || plan.owner || 'Unknown';
@@ -270,6 +275,27 @@ export function filterPlans(plans: PlanSummary[], filters: Filters, text: string
     if (query && !planSearchText(plan).includes(query)) return false;
     return true;
   });
+}
+
+function sourceFacetOptions(plans: PlanSummary[], repository?: RepositoryConfig): FacetOption[] {
+  const roots = new Set(plans.map((plan) => sourceRoot(plan, repository)).filter(Boolean));
+  return Array.from(roots)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+    .map((root) => ({ value: root, label: root }));
+}
+
+function sourceLabel(plan: PlanSummary, repository?: RepositoryConfig): string {
+  return sourceRoot(plan, repository);
+}
+
+function sourceRoot(plan: PlanSummary, repository?: RepositoryConfig): string {
+  const root = plan.planRoot || '';
+  const directories = repository?.planDirectories ?? [];
+  const matched = directories
+    .filter((directory) => root === directory || root.startsWith(`${directory}/`))
+    .sort((a, b) => b.length - a.length)[0];
+  if (matched) return matched;
+  return root.split('/').filter(Boolean)[0] ?? '';
 }
 
 function planSearchText(plan: PlanSummary): string {

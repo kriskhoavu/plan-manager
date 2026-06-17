@@ -41,7 +41,7 @@ The MVP is read-only for managed repositories. It does not edit plan files. It d
 | Backend  | App state API       | Exposes a cheap version for stale-content detection                              |
 | Backend  | HTTP API            | Serves repository, plan, file, and diff data to the frontend                     |
 | Frontend | App shell           | Shows active workspace in the top bar and workspace selection in the left nav    |
-| Frontend | Kanban board        | Shows active-workspace plans by status with scalable multi-select filters        |
+| Frontend | Kanban board        | Shows active-workspace plans by status with source-root and multi-select filters |
 | Frontend | Repository page     | Registers, edits, deletes, scans, and reveals local repositories                 |
 | Frontend | Plan workspace      | Shows file tree, raw Markdown, preview, metadata, and read-only diff             |
 | DevOps   | Build packaging     | Builds one local app binary with embedded frontend assets                        |
@@ -70,21 +70,21 @@ Developer starts Plan Manager
 
 ## Design Decisions
 
-| Decision                                    | Alternatives Considered                     | Rationale                                                                                                  |
-|---------------------------------------------|---------------------------------------------|------------------------------------------------------------------------------------------------------------|
-| Use Go plus React/Vite                      | Node-only, Rust plus React                  | Go gives a simple local binary and strong filesystem/Git access. React/Vite fits the proposed UI.          |
-| Store app data outside managed repos        | Store config in each repo, config file only | The app should not dirty target repositories. A cache is needed for large plan sets.                       |
-| Make v1 read-only                           | Editable workspace, full Git manager        | Read-only browsing gives value first and avoids save, lock, credential, and branch mutation risks.         |
-| Use `plan.yaml` first                       | README-only parsing                         | Existing plans already use `plan.yaml`. It gives stable metadata. File explorer order is filesystem-based. |
-| Add fallback parsing                        | Require `plan.yaml`                         | Older plans and custom folders should still appear as normal plan cards with inferred metadata.            |
-| Support freestyle docs roots                | Force docs into `service/ticket` structure  | General docs folders such as `docs/` should be browsable without fake tickets.                             |
-| Scope Kanban to one active workspace        | Mix all repositories on one board           | A board should represent one project workspace. Repository switching belongs in the left nav.              |
-| Use client-side multi-select board filters  | Add many query params to `/api/plans`       | The board loads cached summaries for the active workspace. Client facets give OR filters without churn.    |
-| Show stale-content prompt                   | Auto-reload pages                           | Reading and detail views should not be interrupted. Users decide when to refresh in-place.                 |
-| Keep repository edit/delete app-local       | Treat registry changes as managed repo ops  | Registry writes only touch Plan Manager data. They do not modify registered repositories.                  |
-| Do not auto fetch in v1                     | Fetch every 15 seconds                      | Fetch changes `.git` refs and can trigger credentials. Manual scan is safer for v1.                        |
-| Treat `specs/design.png` as visual baseline | Treat image as inspiration only             | The UI must not drift away from the documented proposal.                                                   |
-| Use Playwright MCP as a phase gate          | Manual browser checks only                  | AI-agent-run browser checks make layout and workflow regressions visible during development.               |
+| Decision                                    | Alternatives Considered                     | Rationale                                                                                                                           |
+|---------------------------------------------|---------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| Use Go plus React/Vite                      | Node-only, Rust plus React                  | Go gives a simple local binary and strong filesystem/Git access. React/Vite fits the proposed UI.                                   |
+| Store app data outside managed repos        | Store config in each repo, config file only | The app should not dirty target repositories. A cache is needed for large plan sets.                                                |
+| Make v1 read-only                           | Editable workspace, full Git manager        | Read-only browsing gives value first and avoids save, lock, credential, and branch mutation risks.                                  |
+| Use `plan.yaml` first                       | README-only parsing                         | Existing plans already use `plan.yaml`. It gives stable metadata. File explorer order is filesystem-based.                          |
+| Add fallback parsing                        | Require `plan.yaml`                         | Older plans and custom folders should still appear as normal plan cards with inferred metadata.                                     |
+| Support freestyle docs roots                | Force docs into `service/ticket` structure  | General docs folders such as `docs/` should be browsable without fake tickets.                                                      |
+| Scope Kanban to one active workspace        | Mix all repositories on one board           | A board should represent one project workspace. Repository switching belongs in the left nav.                                       |
+| Use client-side multi-select board filters  | Add many query params to `/api/plans`       | The board loads cached summaries for the active workspace. Source, status, author, and branch facets give OR filters without churn. |
+| Show stale-content prompt                   | Auto-reload pages                           | Reading and detail views should not be interrupted. Users decide when to refresh in-place.                                          |
+| Keep repository edit/delete app-local       | Treat registry changes as managed repo ops  | Registry writes only touch Plan Manager data. They do not modify registered repositories.                                           |
+| Do not auto fetch in v1                     | Fetch every 15 seconds                      | Fetch changes `.git` refs and can trigger credentials. Manual scan is safer for v1.                                                 |
+| Treat `specs/design.png` as visual baseline | Treat image as inspiration only             | The UI must not drift away from the documented proposal.                                                                            |
+| Use Playwright MCP as a phase gate          | Manual browser checks only                  | AI-agent-run browser checks make layout and workflow regressions visible during development.                                        |
 
 ## Implementation Clarifications
 
@@ -97,6 +97,7 @@ Developer starts Plan Manager
 - Repository edit updates app registry metadata after validation.
 - Repository delete removes the app registry entry and cached plans for that repository.
 - Kanban shows one active repository/workspace at a time.
+- Kanban can filter by configured source root, such as `plans` or `docs`.
 - Registry and plan-index changes update the app state version.
 - When another tab changes content, existing tabs show a top-right refresh popup.
 - The refresh popup reloads app data in place and does not refresh the whole browser page.

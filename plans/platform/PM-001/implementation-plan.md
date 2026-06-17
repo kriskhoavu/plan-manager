@@ -47,6 +47,7 @@ Avoid:
 - Repository create, edit, delete, path browse, and path reveal actions write only app registry or cache data, not managed repositories.
 - Repository and plan-index changes expose an app state version for stale-content detection.
 - Kanban is scoped to one active repository/workspace selected from the left navigation.
+- Kanban can filter cards by configured source root, such as `plans` or `docs`.
 - Kanban filters are multi-select: options are OR-matched within a filter group and AND-matched across groups.
 - UI parity means matching the proposal layout, density, navigation, and mobile behavior. Pixel-perfect matching is not required.
 
@@ -163,7 +164,7 @@ PM-001: Add frontend shell and API client
 
 **Deliverables:**
 
-- [x] Scalable board toolbar with branch, status, author, and text filters.
+- [x] Scalable board toolbar with source root, branch, status, author, and text filters.
 - [x] Multi-select filter popovers with OR matching within each facet.
 - [x] Selected filter chips and clear actions.
 - [x] Filter chevrons and outside-click dismissal.

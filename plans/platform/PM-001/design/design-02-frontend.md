@@ -91,7 +91,9 @@ App
 - Use compact cards like the design.
 - Show title, repository or service, branch, author when known, tags, and updated time.
 - Scope the board to the active workspace selected from the left navigation.
-- Use branch, status, author, and text filters.
+- Use source root, branch, status, author, and text filters.
+- Source root filters use configured plan directories such as `plans` and `docs`.
+- Cards show a compact source badge so plans and docs remain visually distinguishable.
 - Allow multiple selected options in each filter group.
 - Match selected options as OR within a filter group and AND across filter groups.
 - Use searchable popovers for long option lists.
