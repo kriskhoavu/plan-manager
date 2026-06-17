@@ -144,10 +144,10 @@ PM-002: Refresh index after writes
 
 **Deliverables:**
 
-- [ ] Add frontend types for edit inputs, Git status, Git changes, Git operation results, and branch operations.
-- [ ] Add API client methods for file save, metadata save, status update, new plan, Git status, fetch, pull, push, commit, branch create, and branch switch.
-- [ ] Normalize optional response fields.
-- [ ] Add focused API client tests where current test setup supports them.
+- [x] Add frontend types for edit inputs, Git status, Git changes, Git operation results, and branch operations.
+- [x] Add API client methods for file save, metadata save, status update, new plan, Git status, fetch, pull, push, commit, branch create, and branch switch.
+- [x] Normalize optional response fields.
+- [x] Add focused API client tests where current test setup supports them.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

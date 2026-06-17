@@ -1,4 +1,25 @@
-import type { AppState, FileContent, FileNode, PathSelection, PlanDetail, PlanSummary, RepositoryConfig, RepositoryInput, ScanResult } from './types';
+import type {
+  AppState,
+  BranchCreateInput,
+  BranchSwitchInput,
+  FileContent,
+  FileNode,
+  FileSaveInput,
+  GitCommitInput,
+  GitOperationInput,
+  GitOperationResult,
+  GitStatus,
+  NewPlanInput,
+  PathSelection,
+  PlanDetail,
+  PlanMetadataUpdateInput,
+  PlanStatusUpdateInput,
+  PlanSummary,
+  RepositoryConfig,
+  RepositoryInput,
+  ScanResult,
+  WriteResult
+} from './types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -28,7 +49,27 @@ export const api = {
   plan: async (id: string) => normalizePlanDetail(await request<PlanDetail>(`/api/plans/${id}`)),
   files: async (id: string) => (await request<FileNode[] | null>(`/api/plans/${id}/files`)) ?? [],
   file: (id: string, fileId: string) => request<FileContent>(`/api/plans/${id}/files/${fileId}`),
-  diff: (id: string) => request<{ diff: string }>(`/api/plans/${id}/diff`)
+  saveFile: (id: string, fileId: string, input: FileSaveInput) =>
+    request<WriteResult>(`/api/plans/${id}/files/${fileId}`, { method: 'POST', body: JSON.stringify(input) }),
+  saveMetadata: (id: string, input: PlanMetadataUpdateInput) =>
+    request<WriteResult>(`/api/plans/${id}/metadata`, { method: 'PATCH', body: JSON.stringify(input) }),
+  updateStatus: (id: string, input: PlanStatusUpdateInput) =>
+    request<WriteResult>(`/api/plans/${id}/status`, { method: 'PATCH', body: JSON.stringify(input) }),
+  createPlan: (input: NewPlanInput) => request<WriteResult>('/api/plans', { method: 'POST', body: JSON.stringify(input) }),
+  diff: (id: string) => request<{ diff: string }>(`/api/plans/${id}/diff`),
+  gitStatus: (repositoryId: string) => request<GitStatus>(`/api/repositories/${repositoryId}/git/status`).then(normalizeGitStatus),
+  gitFetch: (repositoryId: string, input: GitOperationInput = {}) =>
+    request<GitOperationResult>(`/api/repositories/${repositoryId}/git/fetch`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult),
+  gitPull: (repositoryId: string, input: GitOperationInput = {}) =>
+    request<GitOperationResult>(`/api/repositories/${repositoryId}/git/pull`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult),
+  gitPush: (repositoryId: string, input: GitOperationInput = {}) =>
+    request<GitOperationResult>(`/api/repositories/${repositoryId}/git/push`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult),
+  gitCommit: (repositoryId: string, input: GitCommitInput) =>
+    request<GitOperationResult>(`/api/repositories/${repositoryId}/git/commit`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult),
+  createBranch: (repositoryId: string, input: BranchCreateInput) =>
+    request<GitOperationResult>(`/api/repositories/${repositoryId}/git/branches`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult),
+  switchBranch: (repositoryId: string, input: BranchSwitchInput) =>
+    request<GitOperationResult>(`/api/repositories/${repositoryId}/git/switch`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult)
 };
 
 function normalizeRepository(repo: RepositoryConfig): RepositoryConfig {
@@ -51,6 +92,25 @@ function normalizePlanDetail(plan: PlanDetail): PlanDetail {
     documents: Array.isArray(plan.documents) ? plan.documents : [],
     metadata: plan.metadata ?? {},
     counts: plan.counts ?? { files: 0 }
+  };
+}
+
+function normalizeGitStatus(status: GitStatus): GitStatus {
+  return {
+    ...status,
+    ahead: status.ahead ?? 0,
+    behind: status.behind ?? 0,
+    dirty: Boolean(status.dirty),
+    conflicted: Boolean(status.conflicted),
+    changes: Array.isArray(status.changes) ? status.changes : []
+  };
+}
+
+function normalizeGitResult(result: GitOperationResult): GitOperationResult {
+  return {
+    ...result,
+    ok: Boolean(result.ok),
+    status: normalizeGitStatus(result.status ?? { repositoryId: '', branch: '', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] })
   };
 }
 

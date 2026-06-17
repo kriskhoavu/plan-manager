@@ -63,6 +63,41 @@ export interface FileContent {
   path: string;
   content: string;
   language: string;
+  hash: string;
+}
+
+export interface FileSaveInput {
+  content: string;
+  expectedHash?: string;
+}
+
+export interface PlanMetadataUpdateInput {
+  title?: string;
+  service?: string;
+  ticket?: string;
+  status?: PlanStatus;
+  owner?: string;
+  tags?: string[];
+}
+
+export interface PlanStatusUpdateInput {
+  status: PlanStatus;
+}
+
+export interface NewPlanInput {
+  repositoryId: string;
+  planDirectory: string;
+  service: string;
+  ticket: string;
+  title: string;
+  status?: PlanStatus;
+  owner?: string;
+  tags?: string[];
+}
+
+export interface WriteResult {
+  plan: PlanDetail;
+  scannedAt: string;
 }
 
 export interface ScanResult {
@@ -81,4 +116,51 @@ export interface AppState {
   repositoryCount: number;
   planCount: number;
   updatedAt: string;
+}
+
+export type GitChangeStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'copied' | 'untracked' | 'conflicted';
+
+export interface GitChange {
+  path: string;
+  oldPath?: string;
+  status: GitChangeStatus;
+  staged: boolean;
+  conflict: boolean;
+}
+
+export interface GitStatus {
+  repositoryId: string;
+  branch: string;
+  upstream?: string;
+  ahead: number;
+  behind: number;
+  dirty: boolean;
+  conflicted: boolean;
+  changes: GitChange[];
+}
+
+export interface GitCommitInput {
+  message: string;
+  paths: string[];
+}
+
+export interface GitOperationInput {
+  confirm?: boolean;
+}
+
+export interface BranchCreateInput {
+  name: string;
+  startPoint?: string;
+  checkout?: boolean;
+}
+
+export interface BranchSwitchInput {
+  name: string;
+  confirm?: boolean;
+}
+
+export interface GitOperationResult {
+  ok: boolean;
+  message?: string;
+  status: GitStatus;
 }
