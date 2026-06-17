@@ -1,5 +1,6 @@
 import { DragEvent, FormEvent, useState } from 'react';
 import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, Trash2, X } from 'lucide-react';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api } from '../lib/api';
 import type { RepositoryConfig } from '../lib/types';
 
@@ -13,6 +14,7 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
   const [pathDragging, setPathDragging] = useState(false);
   const [editingId, setEditingId] = useState('');
   const [editDraft, setEditDraft] = useState({ name: '', path: '', baselineBranch: '', planDirectories: '' });
+  const [repoToRemove, setRepoToRemove] = useState<RepositoryConfig | null>(null);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -84,7 +86,6 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
   };
 
   const removeRepo = async (repo: RepositoryConfig) => {
-    if (!window.confirm(`Remove ${repo.name}? Cached plans for this repository will be removed from the board.`)) return;
     setBusy(true);
     setMessage('');
     try {
@@ -96,6 +97,7 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
       setMessage(err instanceof Error ? err.message : 'Remove failed');
     } finally {
       setBusy(false);
+      setRepoToRemove(null);
     }
   };
 
@@ -209,7 +211,7 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
                     <div className="repo-row-actions">
                       <button className="secondary" type="button" onClick={() => setEditingId('')} disabled={busy}>Cancel</button>
                       <button className="primary" type="button" onClick={() => saveEdit(repo)} disabled={busy}>Save</button>
-                      <button className="secondary danger" type="button" onClick={() => removeRepo(repo)} disabled={busy}><Trash2 size={16} /> Remove</button>
+                      <button className="secondary danger" type="button" onClick={() => setRepoToRemove(repo)} disabled={busy}><Trash2 size={16} /> Remove</button>
                     </div>
                   </>
                 ) : (
@@ -237,6 +239,17 @@ export function RepositoriesPage({ repositories, onChanged }: { repositories: Re
           </div>
         </div>
       </div>
+      {repoToRemove && (
+        <ConfirmDialog
+          title="Remove repository"
+          message={`Remove ${repoToRemove.name}? Cached plans for this repository will be removed from the board.`}
+          confirmLabel={busy ? 'Removing...' : 'Remove'}
+          busy={busy}
+          danger
+          onCancel={() => setRepoToRemove(null)}
+          onConfirm={() => void removeRepo(repoToRemove)}
+        />
+      )}
     </section>
   );
 }

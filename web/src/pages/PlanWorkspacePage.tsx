@@ -18,6 +18,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { marked } from 'marked';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api } from '../lib/api';
 import type { FileContent, FileNode, GitStatus, PlanDetail, PlanMetadataUpdateInput } from '../lib/types';
 
@@ -25,6 +26,7 @@ type Tab = 'preview' | 'raw' | 'diff';
 type DiffMode = 'review' | 'raw';
 type DiffLine = { type: 'context' | 'add' | 'delete' | 'meta'; text: string; oldLine?: number; newLine?: number };
 type DiffFile = { path: string; oldPath?: string; lines: DiffLine[]; additions: number; deletions: number };
+type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
 
 export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged }: { planId: string; refreshKey: number; onBack: () => void; onContentChanged?: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<PlanDetail | null>(null);
@@ -45,6 +47,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   const [diffMode, setDiffMode] = useState<DiffMode>('review');
   const [revertingFile, setRevertingFile] = useState(false);
   const [revertDialogOpen, setRevertDialogOpen] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [tab, setTab] = useState<Tab>('preview');
   const [error, setError] = useState('');
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -87,8 +90,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   });
 
-  const openFile = async (fileId: string) => {
-    if (!confirmDiscardChanges()) return;
+  const loadFile = async (fileId: string) => {
     try {
       const nextFile = await api.file(planId, fileId);
       setFile(nextFile);
@@ -97,6 +99,23 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     } catch (err) {
       setError(err instanceof Error ? err.message : 'File failed to load');
     }
+  };
+
+  const openFile = async (fileId: string) => {
+    if (dirty) {
+      setPendingConfirm({
+        title: 'Discard changes',
+        message: 'Discard unsaved changes and open another file?',
+        confirmLabel: 'Discard',
+        danger: true,
+        onConfirm: () => {
+          setPendingConfirm(null);
+          void loadFile(fileId);
+        }
+      });
+      return;
+    }
+    await loadFile(fileId);
   };
 
   const dirtyFile = file !== null && editorContent !== savedContent;
@@ -226,13 +245,21 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     setSelectedGitPaths((current) => current.includes(path) ? current.filter((item) => item !== path) : [...current, path]);
   };
 
-  const confirmDiscardChanges = () => {
-    if (!dirty) return true;
-    return window.confirm('Discard unsaved changes?');
-  };
-
   const goBack = () => {
-    if (confirmDiscardChanges()) onBack();
+    if (!dirty) {
+      onBack();
+      return;
+    }
+    setPendingConfirm({
+      title: 'Discard changes',
+      message: 'Discard unsaved changes and return to the board?',
+      confirmLabel: 'Discard',
+      danger: true,
+      onConfirm: () => {
+        setPendingConfirm(null);
+        onBack();
+      }
+    });
   };
 
   const saveFile = async () => {
@@ -468,6 +495,16 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
           onConfirm={revertFile}
         />
       )}
+      {pendingConfirm && (
+        <ConfirmDialog
+          title={pendingConfirm.title}
+          message={pendingConfirm.message}
+          confirmLabel={pendingConfirm.confirmLabel}
+          danger={pendingConfirm.danger}
+          onCancel={() => setPendingConfirm(null)}
+          onConfirm={pendingConfirm.onConfirm}
+        />
+      )}
     </section>
   );
 }
@@ -536,40 +573,6 @@ function DiffPanel({ diff, files, mode, selectedPath, selectedFileHasDiff, rever
         </div>
       )}
     </section>
-  );
-}
-
-function ConfirmDialog({ title, message, confirmLabel, busy, danger, onCancel, onConfirm }: {
-  title: string;
-  message: string;
-  confirmLabel: string;
-  busy?: boolean;
-  danger?: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !busy) onCancel();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [busy, onCancel]);
-
-  return (
-    <div className="confirm-backdrop" role="presentation">
-      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-        <header>
-          <h2 id="confirm-title">{title}</h2>
-          <button className="icon-button" type="button" aria-label="Close dialog" disabled={busy} onClick={onCancel}>×</button>
-        </header>
-        <p>{message}</p>
-        <footer>
-          <button className="ghost" type="button" disabled={busy} onClick={onCancel}>Cancel</button>
-          <button className={danger ? 'danger-confirm' : 'primary'} type="button" disabled={busy} onClick={onConfirm}>{confirmLabel}</button>
-        </footer>
-      </section>
-    </div>
   );
 }
 
