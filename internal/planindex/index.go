@@ -1,7 +1,6 @@
 package planindex
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"gopkg.in/yaml.v3"
 	"plan-manager/internal/models"
 )
 
@@ -21,9 +21,9 @@ type Index struct {
 }
 
 type state struct {
-	Plans    []models.PlanDetail  `json:"plans"`
-	Warnings []models.ScanWarning `json:"warnings"`
-	Scans    map[string]time.Time `json:"scans"`
+	Plans    []models.PlanDetail  `json:"plans" yaml:"plans"`
+	Warnings []models.ScanWarning `json:"warnings" yaml:"warnings"`
+	Scans    map[string]time.Time `json:"scans" yaml:"scans"`
 }
 
 type Query struct {
@@ -160,7 +160,7 @@ func (i *Index) load() error {
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &i.state); err != nil {
+	if err := yaml.Unmarshal(data, &i.state); err != nil {
 		return err
 	}
 	if i.state.Scans == nil {
@@ -174,7 +174,7 @@ func (i *Index) saveLocked() error {
 	if err := os.MkdirAll(filepath.Dir(i.path), 0o755); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(i.state, "", "  ")
+	data, err := yaml.Marshal(i.state)
 	if err != nil {
 		return err
 	}

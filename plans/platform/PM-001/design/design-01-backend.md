@@ -27,7 +27,7 @@
 | Server              | Standard `net/http` or a small compatible router |
 | Git access          | Shell out to `git` through a narrow adapter      |
 | Config storage      | OS user data directory                           |
-| Cache storage       | Local JSON cache or equivalent embedded store    |
+| Cache storage       | Local YAML cache in the OS user data directory   |
 | Managed repo writes | Not allowed in v1                                |
 
 ## Data Model

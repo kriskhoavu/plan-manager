@@ -9,7 +9,7 @@ import (
 )
 
 func TestDeleteRepositoryRemovesPlansAndKeepsOthers(t *testing.T) {
-	idx := New(filepath.Join(t.TempDir(), "plans.json"))
+	idx := New(filepath.Join(t.TempDir(), "plans.yaml"))
 	if err := idx.ReplaceRepository("repo-a", []models.PlanDetail{
 		{PlanSummary: models.PlanSummary{ID: "a-1", RepositoryID: "repo-a", Title: "A"}},
 	}, nil, time.Now()); err != nil {

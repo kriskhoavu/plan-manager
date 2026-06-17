@@ -1,7 +1,6 @@
 package registry
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"gopkg.in/yaml.v3"
 	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/models"
 )
@@ -200,7 +200,7 @@ func (r *Registry) load() error {
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &r.records); err != nil {
+	if err := yaml.Unmarshal(data, &r.records); err != nil {
 		return err
 	}
 	r.loaded = true
@@ -211,7 +211,7 @@ func (r *Registry) saveLocked() error {
 	if err := os.MkdirAll(filepath.Dir(r.path), 0o755); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(r.records, "", "  ")
+	data, err := yaml.Marshal(r.records)
 	if err != nil {
 		return err
 	}

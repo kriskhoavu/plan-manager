@@ -23,8 +23,8 @@
 
 ```text
 {user-data}/plan-manager/
-  repositories.json
-  plan-index.json
+  repositories.yaml
+  plan-index.yaml
   logs/
 ```
 

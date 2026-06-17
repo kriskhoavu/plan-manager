@@ -2,7 +2,7 @@
 
 This document describes the current PM-001 architecture and the PM-002 extension points.
 
-Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git repositories, caches plan metadata in JSON, and serves read-only plan data to the frontend.
+Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git repositories, caches plan metadata in YAML files, and serves read-only plan data to the frontend.
 
 ## Goals
 
@@ -53,8 +53,8 @@ User browser
 ┌───────────────▼────────────────┐  ┌───────────▼─────────────────┐
 │ User config directory          │  │ Registered Git repositories │
 │                                │  │                             │
-│ repositories.json              │  │ plans/                      │
-│ plan-index.json                │  │ docs/                       │
+│ repositories.yaml              │  │ plans/                      │
+│ plan-index.yaml                │  │ docs/                       │
 └────────────────────────────────┘  └─────────────────────────────┘
 ```
 
@@ -66,8 +66,8 @@ User browser
 | Server         | `internal/app`          | Resolves app paths, wires dependencies, serves API and frontend |
 | API            | `internal/api`          | Defines HTTP routes and response handling                       |
 | Config         | `internal/config`       | Resolves OS user config path                                    |
-| Registry       | `internal/registry`     | Stores registered repositories in `repositories.json`           |
-| Plan index     | `internal/planindex`    | Stores cached scan results in `plan-index.json`                 |
+| Registry       | `internal/registry`     | Stores registered repositories in `repositories.yaml`           |
+| Plan index     | `internal/planindex`    | Stores cached scan results in `plan-index.yaml`                 |
 | Scanner        | `internal/scanner`      | Reads plan directories and builds plan metadata                 |
 | File access    | `internal/fileaccess`   | Builds file trees and reads files inside allowed plan roots     |
 | Git adapter    | `internal/gitadapter`   | Runs read-only Git commands with timeout                        |
@@ -98,7 +98,7 @@ User creates repository
   -> POST /api/repositories
   -> registry validates name, path, baseline branch, plan directories
   -> Git adapter resolves repository root and validates branch
-  -> registry writes repositories.json
+  -> registry writes repositories.yaml
   -> frontend refreshes repository list
 ```
 
@@ -139,15 +139,15 @@ Frontend polls /api/state
 
 ## Storage Design
 
-Plan Manager does not use a database server in PM-001. It uses JSON files in the OS user config directory.
+Plan Manager does not use a database server in PM-001. It uses YAML files in the OS user config directory.
 
 ```text
 <user-config-dir>/plan-manager/
-  repositories.json
-  plan-index.json
+  repositories.yaml
+  plan-index.yaml
 ```
 
-### repositories.json
+### repositories.yaml
 
 Stores registered repository configuration.
 
@@ -163,21 +163,19 @@ Stores registered repository configuration.
 
 Example:
 
-```json
-[
-  {
-    "id": "discovery-9409b56c",
-    "name": "discovery",
-    "path": "/workspace/discovery",
-    "baselineBranch": "master",
-    "planDirectories": ["plans", "docs"],
-    "createdAt": "2026-06-16T18:21:48Z",
-    "lastScannedAt": "2026-06-17T09:18:05Z"
-  }
-]
+```yaml
+- id: discovery-9409b56c
+  name: discovery
+  path: /workspace/discovery
+  baselineBranch: master
+  planDirectories:
+    - plans
+    - docs
+  createdAt: 2026-06-16T18:21:48Z
+  lastScannedAt: 2026-06-17T09:18:05Z
 ```
 
-### plan-index.json
+### plan-index.yaml
 
 Stores cached plan details, scan warnings, and scan timestamps.
 

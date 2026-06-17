@@ -58,7 +58,7 @@ See [plans/platform/PM-002/README.md](plans/platform/PM-002/README.md).
 | Tests        | Vitest, React Testing Library, Go test  | Unit and UI behavior checks                  |
 | Markdown     | marked                                  | Markdown preview rendering                   |
 | Icons        | lucide-react                            | UI icons                                     |
-| Storage      | JSON files in user config directory     | Registry and plan index cache                |
+| Storage      | YAML files in user config directory     | Registry and plan index cache                |
 | Distribution | Go binary with embedded frontend assets | Local app runtime                            |
 
 ## Repository Layout
@@ -71,8 +71,8 @@ internal/config/           User config path resolution
 internal/fileaccess/       Safe plan file tree and file reads
 internal/gitadapter/       Read-only Git commands
 internal/models/           Shared backend models
-internal/planindex/        JSON-backed plan summary cache
-internal/registry/         JSON-backed repository registry
+internal/planindex/        YAML-backed plan summary cache
+internal/registry/         YAML-backed repository registry
 internal/scanner/          Plan and docs scanner
 internal/systemdialog/     Native folder picker and path reveal
 web/src/                   React app source
@@ -171,8 +171,8 @@ Plan Manager stores its app data in the OS user config directory:
 
 ```text
 <user-config-dir>/plan-manager/
-  repositories.json
-  plan-index.json
+  repositories.yaml
+  plan-index.yaml
 ```
 
 Examples:

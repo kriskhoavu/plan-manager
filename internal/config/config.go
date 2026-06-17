@@ -23,7 +23,7 @@ func ResolvePaths() (Paths, error) {
 	}
 	return Paths{
 		Dir:           dir,
-		RegistryFile:  filepath.Join(dir, "repositories.json"),
-		PlanIndexFile: filepath.Join(dir, "plan-index.json"),
+		RegistryFile:  filepath.Join(dir, "repositories.yaml"),
+		PlanIndexFile: filepath.Join(dir, "plan-index.yaml"),
 	}, nil
 }
