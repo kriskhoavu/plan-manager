@@ -10,6 +10,7 @@ import {
   GitCompare,
   GripVertical,
   Info,
+  RotateCcw,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -21,6 +22,9 @@ import { api } from '../lib/api';
 import type { FileContent, FileNode, GitStatus, PlanDetail, PlanMetadataUpdateInput } from '../lib/types';
 
 type Tab = 'preview' | 'raw' | 'diff';
+type DiffMode = 'review' | 'raw';
+type DiffLine = { type: 'context' | 'add' | 'delete' | 'meta'; text: string; oldLine?: number; newLine?: number };
+type DiffFile = { path: string; oldPath?: string; lines: DiffLine[]; additions: number; deletions: number };
 
 export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged }: { planId: string; refreshKey: number; onBack: () => void; onContentChanged?: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<PlanDetail | null>(null);
@@ -38,6 +42,8 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   const [branchName, setBranchName] = useState('');
   const [gitBusy, setGitBusy] = useState('');
   const [diff, setDiff] = useState('');
+  const [diffMode, setDiffMode] = useState<DiffMode>('review');
+  const [revertingFile, setRevertingFile] = useState(false);
   const [tab, setTab] = useState<Tab>('preview');
   const [error, setError] = useState('');
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -54,7 +60,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
       const first = firstFile(tree);
       if (first) void openFile(first.id);
     }).catch((err: Error) => setError(err.message));
-    api.diff(planId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
+    void loadDiff();
   }, [planId, refreshKey]);
 
   useEffect(() => {
@@ -103,6 +109,9 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   );
   const dirty = dirtyFile || dirtyMetadata;
   const preview = useMemo(() => ({ __html: marked.parse(editorContent || file?.content || '') as string }), [editorContent, file]);
+  const diffFiles = useMemo(() => parseGitDiff(diff), [diff]);
+  const selectedGitPath = useMemo(() => currentGitPath(plan, file), [plan, file]);
+  const selectedFileHasDiff = Boolean(selectedGitPath && diffFiles.some((item) => item.path === selectedGitPath || item.oldPath === selectedGitPath));
   const hasFiles = useMemo(() => hasFile(files), [files]);
   const gridStyle = {
     '--left-panel-width': `${leftCollapsed ? 44 : leftWidth}px`,
@@ -144,6 +153,15 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
       setGitStatus(null);
     } finally {
       setGitLoading(false);
+    }
+  };
+
+  const loadDiff = async () => {
+    try {
+      const payload = await api.diff(planId);
+      setDiff(payload.diff || '');
+    } catch {
+      setDiff('');
     }
   };
 
@@ -227,11 +245,34 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
       setEditorContent(updated.content);
       setSavedContent(updated.content);
       if (plan) await loadGitStatus(plan.repositoryId);
+      await loadDiff();
       await onContentChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'File save failed');
     } finally {
       setSavingFile(false);
+    }
+  };
+
+  const revertFile = async () => {
+    if (!file || !plan) return;
+    if (dirtyFile && !window.confirm('Discard unsaved editor changes and revert this file?')) return;
+    if (!dirtyFile && !window.confirm(`Revert ${file.path} to HEAD?`)) return;
+    setRevertingFile(true);
+    setError('');
+    try {
+      await api.revertFile(planId, file.id);
+      const updated = await api.file(planId, file.id);
+      setFile(updated);
+      setEditorContent(updated.content);
+      setSavedContent(updated.content);
+      await loadDiff();
+      await loadGitStatus(plan.repositoryId);
+      await onContentChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Revert failed');
+    } finally {
+      setRevertingFile(false);
     }
   };
 
@@ -306,7 +347,18 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
               spellCheck={false}
             />
           )}
-          {tab === 'diff' && <pre className="diff-view">{diff}</pre>}
+          {tab === 'diff' && (
+            <DiffPanel
+              diff={diff}
+              files={diffFiles}
+              mode={diffMode}
+              selectedPath={selectedGitPath}
+              selectedFileHasDiff={selectedFileHasDiff}
+              reverting={revertingFile}
+              onModeChange={setDiffMode}
+              onRevertFile={revertFile}
+            />
+          )}
         </div>
         <aside className={rightCollapsed ? 'metadata-panel side-panel collapsed' : 'metadata-panel side-panel'}>
           <div className="panel-header">
@@ -419,6 +471,63 @@ function EmptyDocumentState({ hasFiles }: { hasFiles: boolean }) {
   );
 }
 
+function DiffPanel({ diff, files, mode, selectedPath, selectedFileHasDiff, reverting, onModeChange, onRevertFile }: {
+  diff: string;
+  files: DiffFile[];
+  mode: DiffMode;
+  selectedPath: string;
+  selectedFileHasDiff: boolean;
+  reverting: boolean;
+  onModeChange: (mode: DiffMode) => void;
+  onRevertFile: () => void;
+}) {
+  const shownFiles = selectedPath ? files.filter((item) => item.path === selectedPath || item.oldPath === selectedPath) : files;
+  const reviewFiles = shownFiles.length > 0 ? shownFiles : files;
+  return (
+    <section className="diff-panel">
+      <header className="diff-toolbar">
+        <div className="diff-mode-switch" role="tablist" aria-label="Diff view mode">
+          <button type="button" className={mode === 'review' ? 'active' : ''} onClick={() => onModeChange('review')}>Review</button>
+          <button type="button" className={mode === 'raw' ? 'active' : ''} onClick={() => onModeChange('raw')}>Git</button>
+        </div>
+        <div className="diff-actions">
+          <span>{files.length} changed file{files.length === 1 ? '' : 's'}</span>
+          <button className="danger-action" type="button" disabled={!selectedFileHasDiff || reverting} onClick={onRevertFile}>
+            <RotateCcw size={15} /> {reverting ? 'Reverting...' : 'Revert File'}
+          </button>
+        </div>
+      </header>
+      {mode === 'raw' && <pre className="diff-view">{diff || 'No local changes.'}</pre>}
+      {mode === 'review' && (
+        <div className="diff-review">
+          {reviewFiles.length === 0 && <div className="document-empty"><GitCompare size={22} /><strong>No local changes</strong><span>The selected plan has no Git diff.</span></div>}
+          {reviewFiles.map((item) => (
+            <article className={item.path === selectedPath ? 'diff-file active' : 'diff-file'} key={`${item.oldPath ?? item.path}-${item.path}`}>
+              <header>
+                <strong>{item.path}</strong>
+                {item.oldPath && item.oldPath !== item.path && <span>renamed from {item.oldPath}</span>}
+                <div>
+                  <span className="diff-add">+{item.additions}</span>
+                  <span className="diff-delete">-{item.deletions}</span>
+                </div>
+              </header>
+              <div className="diff-lines">
+                {item.lines.map((line, index) => (
+                  <div className={`diff-line ${line.type}`} key={`${item.path}-${index}`}>
+                    <span className="line-number">{line.oldLine ?? ''}</span>
+                    <span className="line-number">{line.newLine ?? ''}</span>
+                    <code>{line.text || ' '}</code>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TreeNode({ node, onOpen, activeId, depth }: { node: FileNode; onOpen: (id: string) => void; activeId?: string; depth: number }) {
   const indent = { '--tree-indent': `${depth * 14}px` } as CSSProperties & Record<'--tree-indent', string>;
 
@@ -460,4 +569,70 @@ function hasFile(nodes: FileNode[]): boolean {
 
 function sourceLabel(source?: string): string {
   return source === 'docs' ? 'Docs' : 'Plan';
+}
+
+function currentGitPath(plan: PlanDetail | null, file: FileContent | null): string {
+  if (!plan?.planRoot || !file?.path) return '';
+  return `${plan.planRoot.replace(/\/$/, '')}/${file.path.replace(/^\//, '')}`;
+}
+
+function parseGitDiff(diff: string): DiffFile[] {
+  const files: DiffFile[] = [];
+  let current: DiffFile | null = null;
+  let oldLine = 0;
+  let newLine = 0;
+  for (const rawLine of diff.split('\n')) {
+    if (rawLine.startsWith('diff --git ')) {
+      const match = rawLine.match(/^diff --git a\/(.+?) b\/(.+)$/);
+      current = {
+        oldPath: match?.[1],
+        path: match?.[2] ?? match?.[1] ?? rawLine.replace(/^diff --git\s+/, ''),
+        lines: [],
+        additions: 0,
+        deletions: 0
+      };
+      files.push(current);
+      oldLine = 0;
+      newLine = 0;
+      continue;
+    }
+    if (!current) continue;
+    if (rawLine.startsWith('--- ')) {
+      const oldPath = rawLine.replace(/^---\s+a\//, '').replace(/^---\s+/, '');
+      if (oldPath !== '/dev/null') current.oldPath = oldPath;
+      continue;
+    }
+    if (rawLine.startsWith('+++ ')) {
+      const path = rawLine.replace(/^\+\+\+\s+b\//, '').replace(/^\+\+\+\s+/, '');
+      if (path !== '/dev/null') current.path = path;
+      continue;
+    }
+    if (rawLine.startsWith('@@')) {
+      const match = rawLine.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)$/);
+      oldLine = match ? Number(match[1]) : 0;
+      newLine = match ? Number(match[2]) : 0;
+      current.lines.push({ type: 'meta', text: rawLine });
+      continue;
+    }
+    if (rawLine.startsWith('+')) {
+      current.additions += 1;
+      current.lines.push({ type: 'add', text: rawLine.slice(1), newLine });
+      newLine += 1;
+      continue;
+    }
+    if (rawLine.startsWith('-')) {
+      current.deletions += 1;
+      current.lines.push({ type: 'delete', text: rawLine.slice(1), oldLine });
+      oldLine += 1;
+      continue;
+    }
+    if (rawLine.startsWith('index ') || rawLine.startsWith('new file ') || rawLine.startsWith('deleted file ')) {
+      current.lines.push({ type: 'meta', text: rawLine });
+      continue;
+    }
+    current.lines.push({ type: 'context', text: rawLine.startsWith(' ') ? rawLine.slice(1) : rawLine, oldLine, newLine });
+    oldLine += 1;
+    newLine += 1;
+  }
+  return files.filter((item) => item.lines.length > 0 || item.additions > 0 || item.deletions > 0);
 }

@@ -69,6 +69,15 @@ func (a *Access) WriteMarkdown(repo models.RepositoryConfig, plan models.PlanDet
 	return fileContent(relPath, []byte(input.Content)), nil
 }
 
+func (a *Access) RelativePath(repo models.RepositoryConfig, plan models.PlanDetail, fileID string) (string, error) {
+	root, err := a.safePlanRoot(repo, plan)
+	if err != nil {
+		return "", err
+	}
+	relPath, _, err := a.resolveFile(repo, plan, root, fileID)
+	return relPath, err
+}
+
 func (a *Access) safePlanRoot(repo models.RepositoryConfig, plan models.PlanDetail) (string, error) {
 	root, err := safeJoin(repo.Path, plan.PlanRoot)
 	if err != nil {

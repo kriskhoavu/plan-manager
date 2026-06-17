@@ -158,6 +158,15 @@ func (g *GitAdapter) Commit(repoPath, message string, paths []string) error {
 	return err
 }
 
+func (g *GitAdapter) RevertPaths(repoPath string, paths []string) error {
+	if len(paths) == 0 {
+		return fmt.Errorf("at least one path is required")
+	}
+	args := append([]string{"restore", "--source=HEAD", "--staged", "--worktree", "--"}, paths...)
+	_, err := g.run(repoPath, args...)
+	return err
+}
+
 func (g *GitAdapter) CreateBranch(repoPath, name, startPoint string, checkout bool) error {
 	args := []string{"branch", name}
 	if strings.TrimSpace(startPoint) != "" {

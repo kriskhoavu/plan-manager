@@ -51,6 +51,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/plans/{id}/files", a.planFiles)
 	mux.HandleFunc("GET /api/plans/{id}/files/{fileID}", a.planFileContent)
 	mux.HandleFunc("POST /api/plans/{id}/files/{fileID}", a.savePlanFile)
+	mux.HandleFunc("POST /api/plans/{id}/files/{fileID}/revert", a.revertPlanFile)
 	mux.HandleFunc("GET /api/plans/{id}/diff", a.planDiff)
 	mux.HandleFunc("PATCH /api/plans/{id}/metadata", a.savePlanMetadata)
 	mux.HandleFunc("PATCH /api/plans/{id}/status", a.updatePlanStatus)
@@ -281,6 +282,34 @@ func (a *API) savePlanFile(w http.ResponseWriter, r *http.Request) {
 	}
 	input.FileID = r.PathValue("fileID")
 	result, err := a.writer.SaveMarkdown(repo, plan, input)
+	respond(w, result, err)
+}
+
+func (a *API) revertPlanFile(w http.ResponseWriter, r *http.Request) {
+	repo, plan, ok, err := a.repoAndPlan(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "plan not found")
+		return
+	}
+	relPath, err := a.files.RelativePath(repo, plan, r.PathValue("fileID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	gitPath := filepath.ToSlash(filepath.Join(plan.PlanRoot, relPath))
+	if err := validateGitPaths(repo, []string{gitPath}); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := a.git.RevertPaths(repo.Path, []string{gitPath}); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	result, err := a.writer.RefreshRepository(repo)
 	respond(w, result, err)
 }
 

@@ -51,6 +51,8 @@ export const api = {
   file: (id: string, fileId: string) => request<FileContent>(`/api/plans/${id}/files/${fileId}`),
   saveFile: (id: string, fileId: string, input: FileSaveInput) =>
     request<WriteResult>(`/api/plans/${id}/files/${fileId}`, { method: 'POST', body: JSON.stringify(input) }),
+  revertFile: (id: string, fileId: string) =>
+    request<ScanResult>(`/api/plans/${id}/files/${fileId}/revert`, { method: 'POST' }),
   saveMetadata: (id: string, input: PlanMetadataUpdateInput) =>
     request<WriteResult>(`/api/plans/${id}/metadata`, { method: 'PATCH', body: JSON.stringify(input) }),
   updateStatus: (id: string, input: PlanStatusUpdateInput) =>
