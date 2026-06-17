@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Filter, Plus, RotateCw, Search, X } from 'lucide-react';
+import { ChevronDown, Filter, LockKeyhole, RotateCw, Search, X } from 'lucide-react';
 import { api, statusLabels, statusOrder } from '../lib/api';
 import type { PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
 
@@ -103,9 +103,7 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
           <h1>{repository?.name ?? 'Kanban'}</h1>
           <span>{repository ? `${repository.baselineBranch} workspace` : 'No workspace selected'}</span>
         </div>
-        <button className="primary" disabled>
-          <Plus size={16} /> New Plan
-        </button>
+        <span className="readonly-badge"><LockKeyhole size={15} /> Read-only</span>
       </div>
       <div className="board-toolbar">
         <label className="filter-input plan-search">
@@ -153,7 +151,6 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
               {!loading && grouped.get(column)?.map((plan) => <PlanCard key={plan.id} plan={plan} onOpen={() => onOpenPlan(plan.id)} />)}
               {!loading && (grouped.get(column)?.length ?? 0) === 0 && <div className="column-empty">No plans</div>}
             </div>
-            <button className="add-plan" disabled><Plus size={14} /> Add Plan</button>
           </div>
         ))}
       </div>

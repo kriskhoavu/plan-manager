@@ -640,14 +640,6 @@ select {
   font-size: 12px;
 }
 
-.add-plan {
-  min-height: 40px;
-  border: 0;
-  border-top: 1px solid var(--line);
-  background: transparent;
-  color: var(--muted);
-}
-
 .column-empty,
 .empty-inline,
 .empty-state {
@@ -661,6 +653,20 @@ select {
 
 .page-title span {
   color: var(--muted);
+}
+
+.readonly-badge {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .repositories-layout {
