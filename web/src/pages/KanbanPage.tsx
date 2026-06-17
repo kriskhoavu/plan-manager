@@ -16,13 +16,13 @@ const emptyFilters: Filters = {
   authors: []
 };
 
-export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChanged }: {
+export function KanbanPage({ repositories, onOpenPlan, onRepositoriesChanged }: {
   repositories: RepositoryConfig[];
-  query: string;
   onOpenPlan: (planId: string) => void;
   onRepositoriesChanged: () => void;
 }) {
   const [filters, setFilters] = useState<Filters>(emptyFilters);
+  const [query, setQuery] = useState('');
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,7 +47,7 @@ export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChan
     { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) },
     { key: 'branches', title: 'Branches', options: branches.map((branch) => ({ value: branch, label: branch })) }
   ];
-  const activeFilterCount = Object.values(filters).reduce((sum, values) => sum + values.length, 0);
+  const activeFilterCount = Object.values(filters).reduce((sum, values) => sum + values.length, 0) + (text ? 1 : 0);
   const grouped = useMemo(() => {
     const map = new Map<PlanStatus, PlanSummary[]>();
     statusOrder.forEach((item) => map.set(item, []));
@@ -81,6 +81,7 @@ export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChan
 
   const clearFilters = () => {
     setFilters(emptyFilters);
+    setQuery('');
   };
 
   if (repositories.length === 0 && !loading) {
@@ -101,6 +102,10 @@ export function KanbanPage({ repositories, query, onOpenPlan, onRepositoriesChan
         </button>
       </div>
       <div className="board-toolbar">
+        <label className="filter-input plan-search">
+          <Search size={15} />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search plans..." />
+        </label>
         <button className="secondary" onClick={scan}>
           <RotateCw size={16} /> Scan
         </button>

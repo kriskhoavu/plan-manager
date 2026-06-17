@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GitBranch, KanbanSquare, ListChecks, Moon, Search, Sun, Boxes, FolderGit2 } from 'lucide-react';
+import { GitBranch, KanbanSquare, ListChecks, Moon, Sun, Boxes, FolderGit2 } from 'lucide-react';
 import { api } from './lib/api';
 import type { RepositoryConfig } from './lib/types';
 import { KanbanPage } from './pages/KanbanPage';
@@ -23,7 +23,6 @@ export function App() {
   const [route, setRoute] = useState<Route>(routeFromLocation);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'light');
   const [repositories, setRepositories] = useState<RepositoryConfig[]>([]);
-  const [query, setQuery] = useState('');
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -71,10 +70,6 @@ export function App() {
             </button>
           ))}
         </div>
-        <label className="global-search">
-          <Search size={16} />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search plans..." />
-        </label>
         <span className="sync-dot">Last sync: {lastSync}</span>
         <button className="theme-toggle" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label="Toggle theme">
           {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
@@ -95,7 +90,7 @@ export function App() {
       </aside>
 
       <main className="main-content">
-        {route.name === 'kanban' && <KanbanPage repositories={repositories} query={query} onOpenPlan={(planId) => navigate({ name: 'workspace', planId })} onRepositoriesChanged={refreshRepositories} />}
+        {route.name === 'kanban' && <KanbanPage repositories={repositories} onOpenPlan={(planId) => navigate({ name: 'workspace', planId })} onRepositoriesChanged={refreshRepositories} />}
         {route.name === 'workspace' && <PlanWorkspacePage planId={route.planId} onBack={() => navigate({ name: 'kanban' })} />}
         {route.name === 'repositories' && <RepositoriesPage repositories={repositories} onChanged={refreshRepositories} />}
       </main>
