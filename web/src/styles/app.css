@@ -1857,9 +1857,7 @@ body.is-resizing-panel {
   gap: 6px;
 }
 
-.save-file-tab-action {
-  flex: none;
-  min-width: 112px;
+.save-action {
   min-height: 38px;
   border: 1px solid color-mix(in srgb, var(--blue) 54%, var(--line));
   border-radius: 8px;
@@ -1869,11 +1867,11 @@ body.is-resizing-panel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 500;
   box-shadow: 0 10px 22px rgba(79, 70, 229, 0.22);
 }
 
-.save-file-tab-action:disabled {
+.save-action:disabled {
   opacity: 1;
   background: color-mix(in srgb, var(--panel) 84%, var(--panel-soft));
   color: color-mix(in srgb, var(--text) 58%, var(--muted));
@@ -1881,9 +1879,18 @@ body.is-resizing-panel {
   box-shadow: none;
 }
 
-.save-file-tab-action:not(:disabled):hover {
+.save-action:not(:disabled):hover {
   transform: translateY(-1px);
   box-shadow: 0 14px 26px rgba(79, 70, 229, 0.28);
+}
+
+.save-file-tab-action {
+  flex: none;
+  min-width: 112px;
+}
+
+.save-metadata-action {
+  min-width: 138px;
 }
 
 .tab-list button.active {
