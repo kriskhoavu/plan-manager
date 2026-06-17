@@ -291,7 +291,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
               <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}><Code2 size={15} /> Raw</button>
               <button className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}><GitCompare size={15} /> Diff</button>
             </div>
-            <button className="primary save-file-tab-action" type="button" disabled={!dirtyFile || savingFile} onClick={saveFile}>
+            <button className="save-file-tab-action" type="button" disabled={!dirtyFile || savingFile} onClick={saveFile}>
               {savingFile ? 'Saving...' : 'Save File'}
             </button>
           </div>

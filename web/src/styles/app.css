@@ -1826,14 +1826,15 @@ body.is-resizing-panel {
 }
 
 .tabs {
-  height: 48px;
+  min-height: 52px;
   flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  padding: 0 10px;
+  gap: 14px;
+  padding: 8px 10px 8px 12px;
   border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 94%, var(--panel-soft));
 }
 
 .tab-list {
@@ -1844,7 +1845,7 @@ body.is-resizing-panel {
   overflow-x: auto;
 }
 
-.tabs button {
+.tab-list button {
   min-height: 34px;
   border: 0;
   border-radius: 6px;
@@ -1858,8 +1859,31 @@ body.is-resizing-panel {
 
 .save-file-tab-action {
   flex: none;
-  min-height: 34px;
-  padding: 0 12px;
+  min-width: 112px;
+  min-height: 38px;
+  border: 1px solid color-mix(in srgb, var(--blue) 54%, var(--line));
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--blue), #4338ca);
+  color: #ffffff;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.22);
+}
+
+.save-file-tab-action:disabled {
+  opacity: 1;
+  background: color-mix(in srgb, var(--panel) 84%, var(--panel-soft));
+  color: color-mix(in srgb, var(--text) 58%, var(--muted));
+  border-color: color-mix(in srgb, var(--line) 70%, var(--muted));
+  box-shadow: none;
+}
+
+.save-file-tab-action:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(79, 70, 229, 0.28);
 }
 
 .tab-list button.active {
