@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
-import { ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, X } from 'lucide-react';
+import { ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, SlidersHorizontal, X } from 'lucide-react';
 import { marked } from 'marked';
 import { api, editableStatusOrder, statusLabels, statusOrder } from '../lib/api';
 import type { FileContent, FileNode, GitStatus, PlanDetail, PlanMetadataUpdateInput, PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
@@ -22,11 +22,12 @@ const emptyFilters: Filters = {
   authors: []
 };
 
-export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesChanged }: {
+export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesChanged, onOpenRepositories }: {
   repository?: RepositoryConfig;
   refreshKey: number;
   onOpenPlan: (planId: string) => void;
   onRepositoriesChanged: () => void | Promise<void>;
+  onOpenRepositories?: () => void;
 }) {
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [query, setQuery] = useState('');
@@ -207,33 +208,43 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
       {error && <p className="error">{error}</p>}
       <div className="kanban-board" aria-busy={loading}>
         {statusOrder.map((column) => (
-          <div className={`kanban-column ${column}`} key={column}>
-            <header>
-              <h2>{statusLabels[column]}</h2>
-              <span>{grouped.get(column)?.length ?? 0}</span>
-              <Filter size={14} />
-            </header>
-            <div className="card-stack">
-              {loading && Array.from({ length: 3 }).map((_, index) => <div className="plan-card skeleton" key={index} />)}
-              {!loading && grouped.get(column)?.map((plan) => (
-                <PlanCard
-                  key={plan.id}
-                  plan={plan}
-                  repository={repository}
-                  onPreview={() => setDrawerPlanId(plan.id)}
-                  onOpen={() => onOpenPlan(plan.id)}
-                  onMove={(status) => movePlan(plan.id, status)}
-                />
-              ))}
-              {!loading && (grouped.get(column)?.length ?? 0) === 0 && <div className="column-empty">No plans</div>}
+          <Fragment key={column}>
+            <div className={`kanban-column ${column}`}>
+              <header>
+                <h2>{statusLabels[column]}</h2>
+                <span>{grouped.get(column)?.length ?? 0}</span>
+                <Filter size={14} />
+              </header>
+              <div className="card-stack">
+                {loading && Array.from({ length: 3 }).map((_, index) => <div className="plan-card skeleton" key={index} />)}
+                {!loading && grouped.get(column)?.map((plan) => (
+                  <PlanCard
+                    key={plan.id}
+                    plan={plan}
+                    repository={repository}
+                    onPreview={() => setDrawerPlanId(plan.id)}
+                    onOpen={() => onOpenPlan(plan.id)}
+                    onMove={(status) => movePlan(plan.id, status)}
+                  />
+                ))}
+                {!loading && (grouped.get(column)?.length ?? 0) === 0 && <div className="column-empty">No plans</div>}
+              </div>
+              {column !== 'unsorted' && (
+                <button className="new-plan-column-button" type="button" onClick={() => {
+                  setNewPlanDraft((draft) => ({ ...draft, status: column, planDirectory: repository?.planDirectories[0] ?? '' }));
+                  setNewPlanOpen(true);
+                }}>+ New plan</button>
+              )}
             </div>
-            {column !== 'unsorted' && (
-              <button className="new-plan-column-button" type="button" onClick={() => {
-                setNewPlanDraft((draft) => ({ ...draft, status: column, planDirectory: repository?.planDirectories[0] ?? '' }));
-                setNewPlanOpen(true);
-              }}>+ New plan</button>
+            {column === 'unsorted' && (
+              <button className="kanban-separator" type="button" onClick={onOpenRepositories} disabled={!onOpenRepositories} title="Configure source structure">
+                <span className="separator-arrow">▶</span>
+                <span className="separator-count">{grouped.get('unsorted')?.length ?? 0}</span>
+                <span className="separator-label">Configure source structure</span>
+                <SlidersHorizontal size={15} />
+              </button>
             )}
-          </div>
+          </Fragment>
         ))}
       </div>
       {drawerPlanId && (

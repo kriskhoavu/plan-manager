@@ -101,6 +101,7 @@ User runs a Git operation
 - Source directories can opt into structured card discovery with `repository-settings.yaml`.
 - Configured source cards support metadata editing; the first metadata save creates `plan.yaml` in the matched card folder.
 - Freestyle docs roots without source settings appear in the `Unsorted` lane and support Markdown file editing but not structured plan metadata editing.
+- The Kanban board separates `Unsorted` from workflow statuses with a compact action rail that points users to source structure configuration.
 - Commit operations must commit only selected plan paths.
 - Pull, push, and branch switch show confirmation when the working tree or branch state is risky.
 - The app does not auto-fetch in PM-002.

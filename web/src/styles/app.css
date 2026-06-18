@@ -902,9 +902,56 @@ select {
 
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(6, minmax(238px, 1fr));
+  grid-template-columns: minmax(238px, 1fr) 76px repeat(5, minmax(238px, 1fr));
   gap: 14px;
   min-height: 620px;
+}
+
+.kanban-separator {
+  min-width: 0;
+  min-height: 620px;
+  border: 1px solid color-mix(in srgb, var(--green) 44%, var(--line));
+  border-radius: 8px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--green) 15%, var(--panel)), color-mix(in srgb, var(--green) 7%, var(--panel)));
+  color: color-mix(in srgb, var(--green) 58%, var(--text));
+  display: grid;
+  grid-template-rows: 38px 30px 1fr 38px;
+  justify-items: center;
+  align-items: center;
+  padding: 10px 8px;
+  box-shadow: var(--shadow-soft);
+}
+
+.kanban-separator:hover {
+  border-color: color-mix(in srgb, var(--green) 64%, var(--line));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--green) 20%, var(--panel)), color-mix(in srgb, var(--green) 10%, var(--panel)));
+}
+
+.kanban-separator:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.separator-arrow,
+.separator-count {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 86%, var(--panel-soft));
+  color: var(--muted);
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.separator-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.25;
 }
 
 .kanban-column {
@@ -2918,6 +2965,19 @@ body.is-resizing-panel {
 
   .kanban-board {
     grid-template-columns: 1fr;
+  }
+
+  .kanban-separator {
+    min-height: 58px;
+    grid-template-columns: 32px 32px minmax(0, 1fr) 32px;
+    grid-template-rows: 1fr;
+    justify-items: center;
+    text-align: left;
+  }
+
+  .separator-label {
+    justify-self: start;
+    writing-mode: horizontal-tb;
   }
 
   .kanban-column {
