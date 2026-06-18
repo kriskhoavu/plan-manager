@@ -5,7 +5,7 @@ import { marked } from 'marked';
 import { api, editableStatusOrder, statusLabels, statusOrder } from '../lib/api';
 import type { FileContent, FileNode, GitStatus, PlanDetail, PlanMetadataUpdateInput, PlanStatus, PlanSummary, RepositoryConfig } from '../lib/types';
 
-type FilterKey = 'sources' | 'statuses' | 'branches' | 'authors';
+type FilterKey = 'sources' | 'services' | 'statuses' | 'branches' | 'authors';
 
 type Filters = Record<FilterKey, string[]>;
 
@@ -17,6 +17,7 @@ type DrawerFileOption = { id: string; path: string; label: string };
 
 const emptyFilters: Filters = {
   sources: [],
+  services: [],
   statuses: [],
   branches: [],
   authors: []
@@ -58,10 +59,12 @@ export function KanbanPage({ repository, refreshKey, onOpenPlan, onRepositoriesC
 
   const sourceOptions = useMemo(() => sourceFacetOptions(plans, repository), [plans, repository]);
   const filteredPlans = useMemo(() => filterPlans(plans, filters, text, repository), [plans, filters, text, repository]);
+  const services = useMemo(() => unique(plans.map((plan) => plan.service || 'Unknown')), [plans]);
   const branches = useMemo(() => unique(plans.map((plan) => plan.branch)), [plans]);
   const authors = useMemo(() => unique(plans.map((plan) => plan.author || plan.owner || 'Unknown')), [plans]);
   const facetConfig: { key: FilterKey; title: string; options: FacetOption[] }[] = [
     { key: 'sources', title: 'Source', options: sourceOptions },
+    { key: 'services', title: 'Service', options: services.map((service) => ({ value: service, label: service })) },
     { key: 'statuses', title: 'Status', options: statusOrder.map((item) => ({ value: item, label: statusLabels[item] })) },
     { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) },
     { key: 'branches', title: 'Branches', options: branches.map((branch) => ({ value: branch, label: branch })) }
@@ -881,6 +884,8 @@ export function filterPlans(plans: PlanSummary[], filters: Filters, text: string
   const query = text.trim().toLowerCase();
   return plans.filter((plan) => {
     if (filters.sources.length > 0 && !filters.sources.includes(sourceRoot(plan, repository))) return false;
+    const service = plan.service || 'Unknown';
+    if (filters.services.length > 0 && !filters.services.includes(service)) return false;
     if (filters.statuses.length > 0 && !filters.statuses.includes(plan.status)) return false;
     if (filters.branches.length > 0 && !filters.branches.includes(plan.branch)) return false;
     const author = plan.author || plan.owner || 'Unknown';

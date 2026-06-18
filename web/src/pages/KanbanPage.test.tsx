@@ -67,12 +67,17 @@ describe('filterPlans', () => {
   const repository = { id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', planDirectories: ['plans', 'docs'], createdAt: new Date().toISOString() };
 
   it('uses OR within a facet', () => {
-    const result = filterPlans(plans, { sources: ['plans', 'docs'], statuses: [], branches: [], authors: [] }, '', repository);
+    const result = filterPlans(plans, { sources: ['plans', 'docs'], services: [], statuses: [], branches: [], authors: [] }, '', repository);
     expect(result.map((plan) => plan.id)).toEqual(['p1', 'p2']);
   });
 
+  it('filters by service', () => {
+    const result = filterPlans(plans, { sources: [], services: ['api'], statuses: [], branches: [], authors: [] }, '', repository);
+    expect(result.map((plan) => plan.id)).toEqual(['p1']);
+  });
+
   it('uses AND across facets', () => {
-    const result = filterPlans(plans, { sources: ['docs'], statuses: ['unsorted'], branches: [], authors: ['Giang'] }, '', repository);
+    const result = filterPlans(plans, { sources: ['docs'], services: ['docs'], statuses: ['unsorted'], branches: [], authors: ['Giang'] }, '', repository);
     expect(result.map((plan) => plan.id)).toEqual(['p2']);
   });
 });
