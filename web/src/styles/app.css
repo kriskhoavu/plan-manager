@@ -1624,7 +1624,11 @@ body.is-resizing-drawer {
   grid-template-columns: var(--left-panel-width, 300px) minmax(0, 1fr) var(--right-panel-width, 300px);
   gap: 12px;
   align-items: stretch;
-  transition: grid-template-columns 180ms ease;
+  transition: grid-template-columns 160ms ease;
+}
+
+body.is-resizing-panel .workspace-grid {
+  transition: none;
 }
 
 .file-tree,
@@ -1702,26 +1706,27 @@ body.is-resizing-drawer {
 
 .panel-resize-handle {
   position: absolute;
-  top: 56px;
-  bottom: 12px;
-  width: 14px;
+  top: 52px;
+  bottom: 10px;
+  width: 18px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 999px;
   background: transparent;
   color: var(--muted);
   display: grid;
   place-items: center;
   cursor: col-resize;
-  opacity: 0;
-  transition: opacity 150ms ease, background 150ms ease, color 150ms ease;
+  opacity: .2;
+  transition: opacity 120ms ease, background 120ms ease, color 120ms ease, transform 120ms ease;
+  z-index: 4;
 }
 
 .panel-resize-handle-left {
-  right: -7px;
+  right: -9px;
 }
 
 .panel-resize-handle-right {
-  left: -7px;
+  left: -9px;
 }
 
 .side-panel:hover .panel-resize-handle,
@@ -1735,6 +1740,7 @@ body.is-resizing-panel .panel-resize-handle {
 body.is-resizing-panel .panel-resize-handle {
   background: var(--panel-soft);
   color: var(--blue);
+  transform: scaleX(1.08);
 }
 
 body.is-resizing-panel {
@@ -2241,6 +2247,63 @@ body.is-resizing-panel {
 .metadata-panel dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.status-badge {
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--panel-soft);
+  color: var(--muted);
+}
+
+.status-badge.ideas {
+  background: color-mix(in srgb, #0ea5e9 12%, var(--panel));
+  color: #0369a1;
+}
+
+.status-badge.draft {
+  background: color-mix(in srgb, var(--blue) 11%, var(--panel));
+  color: var(--blue);
+}
+
+.status-badge.in_progress {
+  background: color-mix(in srgb, var(--orange) 13%, var(--panel));
+  color: var(--orange);
+}
+
+.status-badge.review {
+  background: color-mix(in srgb, var(--purple) 12%, var(--panel));
+  color: var(--purple);
+}
+
+.status-badge.done {
+  background: color-mix(in srgb, var(--green) 12%, var(--panel));
+  color: var(--green);
+}
+
+:root[data-theme="dark"] .status-badge.ideas {
+  color: #7dd3fc;
+}
+
+:root[data-theme="dark"] .status-badge.draft {
+  color: #a5b4fc;
+}
+
+:root[data-theme="dark"] .status-badge.in_progress {
+  color: #fdba74;
+}
+
+:root[data-theme="dark"] .status-badge.review {
+  color: #c4b5fd;
+}
+
+:root[data-theme="dark"] .status-badge.done {
+  color: #86efac;
 }
 
 .metadata-callout {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   ArrowLeft,
@@ -57,6 +57,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(300);
   const [rightWidth, setRightWidth] = useState(300);
+  const workspaceGridRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setError('');
@@ -145,22 +146,25 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
     event.preventDefault();
     const startX = event.clientX;
     const startingWidth = side === 'left' ? leftWidth : rightWidth;
+    let latestWidth = startingWidth;
 
     const onPointerMove = (moveEvent: PointerEvent) => {
       const delta = moveEvent.clientX - startX;
       const nextWidth = side === 'left' ? startingWidth + delta : startingWidth - delta;
       const boundedWidth = Math.min(520, Math.max(220, nextWidth));
-      if (side === 'left') {
-        setLeftWidth(boundedWidth);
-      } else {
-        setRightWidth(boundedWidth);
-      }
+      latestWidth = boundedWidth;
+      workspaceGridRef.current?.style.setProperty(side === 'left' ? '--left-panel-width' : '--right-panel-width', `${boundedWidth}px`);
     };
 
     const onPointerUp = () => {
       document.body.classList.remove('is-resizing-panel');
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      if (side === 'left') {
+        setLeftWidth(latestWidth);
+      } else {
+        setRightWidth(latestWidth);
+      }
     };
 
     document.body.classList.add('is-resizing-panel');
@@ -336,7 +340,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
         </div>
         <button className="secondary" disabled={gitLoading}><RefreshCw size={16} /> {gitStatus?.dirty ? 'Local changes' : 'Git status'}</button>
       </header>
-      <div className="workspace-grid" style={gridStyle}>
+      <div className="workspace-grid" style={gridStyle} ref={workspaceGridRef}>
         <aside className={leftCollapsed ? 'file-tree side-panel collapsed' : 'file-tree side-panel'}>
           <div className="panel-header">
             <h2><FolderOpen size={16} /> Files</h2>
@@ -392,7 +396,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
         </div>
         <aside className={rightCollapsed ? 'metadata-panel side-panel collapsed' : 'metadata-panel side-panel'}>
           <div className="panel-header">
-            <h2><Info size={16} /> Plan Info</h2>
+            <h2><Info size={16} /> Work Item</h2>
             <button className="icon-button" type="button" title={rightCollapsed ? 'Expand plan info' : 'Collapse plan info'} onClick={() => setRightCollapsed((value) => !value)}>
               {rightCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
             </button>
@@ -419,7 +423,7 @@ export function PlanWorkspacePage({ planId, refreshKey, onBack, onContentChanged
                 <dt>Repository</dt><dd>{plan?.repositoryName}</dd>
                 <dt>Service</dt><dd>{plan?.service}</dd>
                 <dt>Branch</dt><dd>{plan?.branch}</dd>
-                <dt>Status</dt><dd>{plan?.status}</dd>
+                <dt>Status</dt><dd>{plan?.status && <StatusBadge status={plan.status} />}</dd>
                 <dt>Source</dt><dd>{sourceLabel(plan?.metadataSource)}</dd>
                 <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
                 <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
@@ -537,6 +541,27 @@ function EmptyDocumentState({ hasFiles }: { hasFiles: boolean }) {
       <span>{hasFiles ? 'Choose a file from the explorer to preview its content.' : 'This plan folder does not contain any readable files yet.'}</span>
     </div>
   );
+}
+
+function StatusBadge({ status }: { status: PlanDetail['status'] }) {
+  return <span className={`status-badge ${status}`}>{statusLabel(status)}</span>;
+}
+
+function statusLabel(status: PlanDetail['status']): string {
+  switch (status) {
+    case 'ideas':
+      return 'Ideas';
+    case 'draft':
+      return 'Draft';
+    case 'in_progress':
+      return 'In Progress';
+    case 'review':
+      return 'Review';
+    case 'done':
+      return 'Done';
+    default:
+      return status;
+  }
 }
 
 function DiffPanel({ diff, files, mode, selectedPath, selectedFileHasDiff, reverting, onModeChange, onRevertFile }: {
