@@ -15,7 +15,7 @@ Add local audit events, workspace health checks, safer operation feedback, and s
 | F1    | API Types And Client Methods | ✅     |
 | F2    | Health And Audit State       | ✅     |
 | F3    | Safety Feedback UI           | ✅     |
-| F4    | Styling And Verification     |        |
+| F4    | Styling And Verification     | ✅     |
 
 ## Backend Phases
 
@@ -177,10 +177,10 @@ PM-004: Add reliability UI panels
 
 **Deliverables:**
 
-- [ ] Add compact styles for health and activity panels.
-- [ ] Verify desktop and mobile layout.
-- [ ] Run full build.
-- [ ] Update embedded frontend assets.
+- [x] Add compact styles for health and activity panels.
+- [x] Add and review desktop and mobile responsive constraints. Screenshot verification was unavailable because the in-app browser could not start.
+- [x] Run full build.
+- [x] Update embedded frontend assets.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build`
 

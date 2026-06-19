@@ -1850,6 +1850,153 @@ body.is-resizing-drawer {
   gap: 8px;
 }
 
+.health-panel {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.health-panel > header,
+.activity-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.health-panel > header > span,
+.activity-panel > header > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.health-checks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.health-check {
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.health-check svg,
+.activity-row svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--green);
+}
+
+.health-check.warning svg,
+.activity-row.blocked svg {
+  color: var(--orange);
+}
+
+.health-check.failed svg,
+.activity-row.failed svg {
+  color: #dc2626;
+}
+
+.reliability-muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.activity-panel {
+  position: fixed;
+  z-index: 45;
+  top: 58px;
+  right: 68px;
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 76px));
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.activity-panel > header > div,
+.recovery-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.activity-list {
+  display: grid;
+}
+
+.activity-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  border-top: 1px solid var(--line);
+  padding: 9px 0;
+}
+
+.activity-row > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.activity-row strong {
+  font-size: 12px;
+}
+
+.activity-row small,
+.activity-row time {
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.operation-error {
+  display: grid;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, #dc2626 28%, var(--line));
+  border-radius: 6px;
+  background: color-mix(in srgb, #dc2626 7%, var(--panel));
+  padding: 10px;
+}
+
+.operation-error p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.recovery-actions {
+  flex-wrap: wrap;
+}
+
+.recovery-actions button {
+  min-height: 32px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
 .repo-empty {
   min-height: 120px;
   display: grid;
@@ -3156,6 +3303,15 @@ body.is-resizing-panel {
   .repo-row-actions {
     grid-column: 1 / -1;
     justify-content: flex-end;
+  }
+
+  .health-checks {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-panel {
+    top: 52px;
+    right: 12px;
   }
 
   .plan-drawer-body {
