@@ -1,5 +1,35 @@
 export type ItemStatus = 'unsorted' | 'ideas' | 'draft' | 'in_progress' | 'review' | 'done';
 
+export type AuditStatus = 'success' | 'blocked' | 'failed';
+export type HealthStatus = 'ok' | 'warning' | 'failed';
+
+export interface AuditEvent {
+  id: string;
+  time: string;
+  workspaceId?: string;
+  itemId?: string;
+  operation: string;
+  status: AuditStatus;
+  message: string;
+  paths: string[];
+  durationMs: number;
+  error?: string;
+}
+
+export interface HealthCheck {
+  name: string;
+  status: HealthStatus;
+  message: string;
+  recoveryHint?: string;
+}
+
+export interface WorkspaceHealth {
+  workspaceId: string;
+  checkedAt: string;
+  checks: HealthCheck[];
+  summary: HealthStatus;
+}
+
 export interface WorkspaceConfig {
   id: string;
   name: string;
@@ -190,5 +220,6 @@ export interface BranchSwitchInput {
 export interface GitOperationResult {
   ok: boolean;
   message?: string;
+  recoveryHint?: string;
   status: GitStatus;
 }

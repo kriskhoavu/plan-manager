@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from '.';
+import { ApiError, api } from '.';
 
 describe('shared api facade', () => {
   afterEach(() => {
@@ -32,5 +32,38 @@ describe('shared api facade', () => {
       conflicted: false,
       changes: []
     });
+  });
+
+  it('normalizes audit and workspace health responses', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: 'event-1', time: '2026-06-20T00:00:00Z', operation: 'scan', status: 'unknown', message: 'done' }]
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ workspaceId: 'w1', checkedAt: '2026-06-20T00:00:00Z', summary: 'unknown' })
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(api.auditEvents({ workspaceId: 'w1', limit: 5 })).resolves.toEqual([
+      { id: 'event-1', time: '2026-06-20T00:00:00Z', operation: 'scan', status: 'success', message: 'done', paths: [], durationMs: 0 }
+    ]);
+    await expect(api.workspaceHealth('w1')).resolves.toEqual({
+      workspaceId: 'w1', checkedAt: '2026-06-20T00:00:00Z', summary: 'ok', checks: []
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/audit-events?workspaceId=w1&limit=5', expect.any(Object));
+  });
+
+  it('preserves recovery hints on API errors', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'File changed', recoveryHint: 'Reload the file.' })
+    }));
+
+    const error = await api.saveFile('item-1', 'README_md', { content: 'new' }).catch((caught) => caught);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ message: 'File changed', recoveryHint: 'Reload the file.' });
   });
 });

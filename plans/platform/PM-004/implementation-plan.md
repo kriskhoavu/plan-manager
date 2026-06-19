@@ -12,7 +12,7 @@ Add local audit events, workspace health checks, safer operation feedback, and s
 | B2    | Health And Safety Services   | ✅     |
 | B3    | Application Integration      | ✅     |
 | B4    | Reliability Tests            | ✅     |
-| F1    | API Types And Client Methods |        |
+| F1    | API Types And Client Methods | ✅     |
 | F2    | Health And Audit State       |        |
 | F3    | Safety Feedback UI           |        |
 | F4    | Styling And Verification     |        |
@@ -111,10 +111,10 @@ PM-004: Add reliability regression tests
 
 **Deliverables:**
 
-- [ ] Add frontend types for `AuditEvent`, `WorkspaceHealth`, and `HealthCheck`.
-- [ ] Add API client methods for audit and health endpoints.
-- [ ] Normalize optional arrays and status values.
-- [ ] Add API client tests.
+- [x] Add frontend types for `AuditEvent`, `WorkspaceHealth`, and `HealthCheck`.
+- [x] Add API client methods for audit and health endpoints.
+- [x] Normalize optional arrays and status values.
+- [x] Add API client tests.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

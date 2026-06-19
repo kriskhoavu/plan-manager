@@ -1,5 +1,6 @@
 import type {
   AppState,
+  AuditEvent,
   BranchCreateInput,
   BranchSwitchInput,
   FileContent,
@@ -9,6 +10,7 @@ import type {
   GitOperationInput,
   GitOperationResult,
   GitStatus,
+  HealthCheck,
   NewItemInput,
   PathSelection,
   ItemDetail,
@@ -17,11 +19,22 @@ import type {
   ItemSummary,
   WorkspaceConfig,
   WorkspaceInput,
+  WorkspaceHealth,
   SourceStructureSettings,
   ScanResult,
   SourceSettingsResult,
   WriteResult
 } from '../../lib/types';
+
+export class ApiError extends Error {
+  recoveryHint?: string;
+
+  constructor(message: string, recoveryHint?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.recoveryHint = recoveryHint;
+  }
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -33,18 +46,26 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(payload.error ?? `Request failed: ${res.status}`);
+    throw new ApiError(payload.error ?? `Request failed: ${res.status}`, payload.recoveryHint);
   }
   return payload as T;
 }
 
 export const api = {
   state: () => request<AppState>('/api/state'),
+  auditEvents: async (params: { workspaceId?: string; limit?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.workspaceId) query.set('workspaceId', params.workspaceId);
+    if (params.limit) query.set('limit', String(params.limit));
+    const suffix = query.size ? `?${query.toString()}` : '';
+    return ((await request<AuditEvent[] | null>(`/api/audit-events${suffix}`)) ?? []).map(normalizeAuditEvent);
+  },
   workspaces: async () => ((await request<WorkspaceConfig[] | null>('/api/workspaces')) ?? []).map(normalizeWorkspace),
   createWorkspace: (input: WorkspaceInput) => request<WorkspaceConfig>('/api/workspaces', { method: 'POST', body: JSON.stringify(input) }),
   updateWorkspace: (id: string, input: WorkspaceInput) => request<WorkspaceConfig>(`/api/workspaces/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteWorkspace: (id: string) => request<{ ok: boolean }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
   scan: (workspaceId: string) => request<ScanResult>(`/api/workspaces/${workspaceId}/scan`, { method: 'POST' }),
+  workspaceHealth: (workspaceId: string) => request<WorkspaceHealth>(`/api/workspaces/${workspaceId}/health`).then(normalizeWorkspaceHealth),
   sourceStructure: (workspaceId: string, directory: string) =>
     request<SourceSettingsResult>(`/api/workspaces/${workspaceId}/source-structure?directory=${encodeURIComponent(directory)}`),
   saveSourceStructure: (workspaceId: string, directory: string, settings: SourceStructureSettings) =>
@@ -123,6 +144,35 @@ function normalizeGitResult(result: GitOperationResult): GitOperationResult {
     ok: Boolean(result.ok),
     status: normalizeGitStatus(result.status ?? { workspaceId: '', branch: '', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] })
   };
+}
+
+function normalizeAuditEvent(event: AuditEvent): AuditEvent {
+  return {
+    ...event,
+    status: normalizeAuditStatus(event.status),
+    paths: Array.isArray(event.paths) ? event.paths : [],
+    durationMs: event.durationMs ?? 0
+  };
+}
+
+function normalizeWorkspaceHealth(health: WorkspaceHealth): WorkspaceHealth {
+  return {
+    ...health,
+    summary: normalizeHealthStatus(health.summary),
+    checks: (Array.isArray(health.checks) ? health.checks : []).map(normalizeHealthCheck)
+  };
+}
+
+function normalizeHealthCheck(check: HealthCheck): HealthCheck {
+  return { ...check, status: normalizeHealthStatus(check.status) };
+}
+
+function normalizeAuditStatus(status: AuditEvent['status']): AuditEvent['status'] {
+  return status === 'blocked' || status === 'failed' ? status : 'success';
+}
+
+function normalizeHealthStatus(status: HealthCheck['status']): HealthCheck['status'] {
+  return status === 'warning' || status === 'failed' ? status : 'ok';
 }
 
 export const statusLabels = {
