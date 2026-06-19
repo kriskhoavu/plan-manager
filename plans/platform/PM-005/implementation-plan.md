@@ -15,7 +15,7 @@ Add global search, saved filters, recent items, and quick navigation. Use the ex
 | F1    | API Types And Client Methods | ✅     |
 | F2    | Search State And Keyboard    | ✅     |
 | F3    | Search And Filter UI         | ✅     |
-| F4    | Styling And Verification     |        |
+| F4    | Styling And Verification     | ✅     |
 
 ## Backend Phases
 
@@ -176,10 +176,10 @@ PM-005: Add search and saved filter UI
 
 **Deliverables:**
 
-- [ ] Add compact search dialog styles.
-- [ ] Verify keyboard and mobile behavior.
-- [ ] Run full production build.
-- [ ] Update embedded frontend assets.
+- [x] Add compact search dialog styles.
+- [x] Verify keyboard behavior with hook tests and add mobile responsive constraints. Screenshot verification was unavailable because the in-app browser could not start.
+- [x] Run full production build.
+- [x] Update embedded frontend assets.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build`
 

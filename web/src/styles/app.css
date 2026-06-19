@@ -1935,6 +1935,214 @@ body.is-resizing-drawer {
   gap: 10px;
 }
 
+.search-trigger {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+
+.search-trigger:hover {
+  border-color: color-mix(in srgb, var(--blue) 40%, var(--line));
+  color: var(--text);
+}
+
+.search-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(15 23 42 / 34%);
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  padding: min(12vh, 96px) 16px 24px;
+}
+
+.search-dialog {
+  width: min(680px, 100%);
+  max-height: min(680px, calc(100vh - 120px));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 24px 64px rgb(15 23 42 / 24%);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.search-dialog > header {
+  min-height: 56px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.global-search-input {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+}
+
+.global-search-input input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.search-scope {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 12px;
+  display: flex;
+  gap: 4px;
+}
+
+.search-scope button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.search-scope button.active {
+  background: var(--panel-soft);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.search-results {
+  min-height: 180px;
+  overflow: auto;
+  padding: 8px;
+}
+
+.search-result-group {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.search-result-group h3 {
+  margin: 0;
+  padding: 7px 8px 4px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.search-result {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 9px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+.search-result:hover,
+.search-result.active {
+  border-color: color-mix(in srgb, var(--blue) 25%, var(--line));
+  background: color-mix(in srgb, var(--blue) 7%, var(--panel));
+  color: var(--blue);
+}
+
+.search-result > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.search-result strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result small,
+.search-empty {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-empty {
+  display: block;
+  padding: 18px 10px;
+  text-align: center;
+}
+
+.saved-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.save-filter-form,
+.saved-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.save-filter-form input {
+  width: 160px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0 9px;
+}
+
+.saved-filter {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  padding-left: 8px;
+}
+
+.saved-filter button {
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+.saved-filter button:last-child {
+  color: var(--muted);
+}
+
 .activity-panel > header > div,
 .recovery-actions {
   display: flex;
@@ -3312,6 +3520,37 @@ body.is-resizing-panel {
   .activity-panel {
     top: 52px;
     right: 12px;
+  }
+
+  .search-trigger span {
+    display: none;
+  }
+
+  .search-trigger {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .search-backdrop {
+    padding: 10px;
+  }
+
+  .search-dialog {
+    max-height: calc(100vh - 20px);
+  }
+
+  .search-scope button {
+    flex: 1;
+  }
+
+  .save-filter-form {
+    width: 100%;
+  }
+
+  .save-filter-form input {
+    min-width: 0;
+    flex: 1;
   }
 
   .plan-drawer-body {
