@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { routeFromLocation } from './App';
+import { routeFromLocation } from './app/router';
 
 describe('routeFromLocation', () => {
   it('parses item workspace routes', () => {

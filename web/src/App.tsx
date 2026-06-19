@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bell, ChevronDown, GitBranch, KanbanSquare, ListChecks, Moon, Plus, Sun, Boxes, FolderGit2 } from 'lucide-react';
-import { api } from './lib/api';
 import type { WorkspaceConfig } from './lib/types';
+import { useAppState } from './app/useAppState';
+export type { Route } from './app/router';
+export { routeFromLocation } from './app/router';
 import { BranchesPage } from './pages/BranchesPage';
 import { KanbanPage } from './pages/KanbanPage';
 import { ItemsPage } from './pages/ItemsPage';
@@ -9,127 +11,24 @@ import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 import { labels } from './lib/vocabulary';
 
-export type Route = { name: 'kanban' } | { name: 'items' } | { name: 'branches' } | { name: 'workspaces' } | { name: 'workspace'; itemId: string };
-
-const contentVersionStorageKey = 'itemManagerContentVersion';
-
-export function routeFromLocation(): Route {
-  const path = window.location.pathname;
-  if (path.startsWith('/items/')) {
-    return { name: 'workspace', itemId: decodeURIComponent(path.split('/')[2] ?? '') };
-  }
-  if (path === '/items') {
-    return { name: 'items' };
-  }
-  if (path.startsWith('/branches')) {
-    return { name: 'branches' };
-  }
-  if (path.startsWith('/workspaces')) {
-    return { name: 'workspaces' };
-  }
-  return { name: 'kanban' };
-}
-
 export function App() {
-  const [route, setRoute] = useState<Route>(routeFromLocation);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'light');
-  const [workspaces, setWorkspaces] = useState<WorkspaceConfig[]>([]);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState(() => localStorage.getItem('activeWorkspaceId') ?? '');
-  const [contentRefreshKey, setContentRefreshKey] = useState(0);
-  const [stateVersion, setStateVersion] = useState('');
-  const [showStaleNotice, setShowStaleNotice] = useState(false);
+  const {
+    route,
+    theme,
+    setTheme,
+    workspaces,
+    activeRepo,
+    contentRefreshKey,
+    showStaleNotice,
+    setShowStaleNotice,
+    navigate,
+    selectWorkspace: selectWorkspaceState,
+    refreshAppData,
+    refreshAppStateOnly,
+    lastSync
+  } = useAppState();
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  useEffect(() => {
-    const onPop = () => setRoute(routeFromLocation());
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
-
-  const navigate = (next: Route) => {
-    const path = next.name === 'workspace' ? `/items/${encodeURIComponent(next.itemId)}` : next.name === 'workspaces' ? '/workspaces' : next.name === 'items' ? '/items' : next.name === 'branches' ? '/branches' : '/kanban';
-    history.pushState(null, '', path);
-    setRoute(next);
-  };
-
-  const refreshWorkspaces = () => api.workspaces().then(setWorkspaces).catch(() => setWorkspaces([]));
-  const markStateCurrent = async (broadcast = false) => {
-    const state = await api.state();
-    setStateVersion(state.version);
-    setShowStaleNotice(false);
-    if (broadcast) {
-      localStorage.setItem(contentVersionStorageKey, `${state.version}:${Date.now()}`);
-    }
-  };
-  const refreshAppData = async (broadcast = false) => {
-    await refreshWorkspaces();
-    setContentRefreshKey((key) => key + 1);
-    await markStateCurrent(broadcast);
-  };
-  const refreshAppStateOnly = async (broadcast = false) => {
-    await refreshWorkspaces();
-    await markStateCurrent(broadcast);
-  };
-
-  useEffect(() => {
-    void refreshAppData();
-  }, []);
-
-  useEffect(() => {
-    const checkState = async () => {
-      if (document.hidden) return;
-      try {
-        const state = await api.state();
-        if (!stateVersion) {
-          setStateVersion(state.version);
-        } else if (state.version !== stateVersion) {
-          setShowStaleNotice(true);
-        }
-      } catch {
-        // The regular page APIs already surface request errors where needed.
-      }
-    };
-    const interval = window.setInterval(checkState, 30000);
-    const onVisibilityChange = () => {
-      if (!document.hidden) void checkState();
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
-  }, [stateVersion]);
-
-  useEffect(() => {
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== contentVersionStorageKey || !event.newValue) return;
-      const version = event.newValue.split(':')[0];
-      if (stateVersion && version !== stateVersion) {
-        setShowStaleNotice(true);
-      }
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, [stateVersion]);
-
-  useEffect(() => {
-    if (workspaces.length === 0) {
-      setActiveWorkspaceId('');
-      localStorage.removeItem('activeWorkspaceId');
-      return;
-    }
-    if (!workspaces.some((repo) => repo.id === activeWorkspaceId)) {
-      const nextId = workspaces[0].id;
-      setActiveWorkspaceId(nextId);
-      localStorage.setItem('activeWorkspaceId', nextId);
-    }
-  }, [activeWorkspaceId, workspaces]);
 
   useEffect(() => {
     if (!workspaceMenuOpen) return;
@@ -150,20 +49,9 @@ export function App() {
   }, [workspaceMenuOpen]);
 
   const selectWorkspace = (repo: WorkspaceConfig) => {
-    setActiveWorkspaceId(repo.id);
-    localStorage.setItem('activeWorkspaceId', repo.id);
+    selectWorkspaceState(repo);
     setWorkspaceMenuOpen(false);
-    navigate({ name: 'kanban' });
   };
-
-  const activeRepo = workspaces.find((repo) => repo.id === activeWorkspaceId) ?? workspaces[0];
-  const lastSync = useMemo(() => {
-    if (!activeRepo?.lastScannedAt) return 'Not scanned';
-    return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(
-      Math.round((new Date(activeRepo.lastScannedAt).getTime() - Date.now()) / 60000),
-      'minute'
-    );
-  }, [activeRepo]);
 
   return (
     <div className="app-shell">

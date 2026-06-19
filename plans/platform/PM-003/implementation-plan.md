@@ -12,7 +12,7 @@ Refactor Plan Manager architecture in small behavior-preserving phases. Each pha
 | B1    | Backend Application Services            | Done   |
 | B2    | Scanner And Path Guard Separation       | Done   |
 | B3    | Backend Performance Improvements        | Done   |
-| F1    | Frontend App State And API Modules      |        |
+| F1    | Frontend App State And API Modules      | Done   |
 | F2    | Frontend Feature Hooks And Components   |        |
 | F3    | Frontend Styles And Render Performance  |        |
 | D1    | Architecture Documentation Finalization |        |
@@ -113,10 +113,10 @@ PM-003: Improve backend scan performance
 
 **Deliverables:**
 
-- [ ] Move route parsing and path generation into `web/src/app/router.ts`.
-- [ ] Move workspace, theme, refresh, and stale-state logic into app hooks.
-- [ ] Split API client by resource while preserving the exported `api` facade.
-- [ ] Add tests for app state helpers and API normalization.
+- [x] Move route parsing and path generation into `web/src/app/router.ts`.
+- [x] Move workspace, theme, refresh, and stale-state logic into app hooks.
+- [x] Split API client by resource while preserving the exported `api` facade.
+- [x] Add tests for app state helpers and API normalization.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
