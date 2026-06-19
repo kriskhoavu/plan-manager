@@ -13,7 +13,7 @@ Add local audit events, workspace health checks, safer operation feedback, and s
 | B3    | Application Integration      | ✅     |
 | B4    | Reliability Tests            | ✅     |
 | F1    | API Types And Client Methods | ✅     |
-| F2    | Health And Audit State       |        |
+| F2    | Health And Audit State       | ✅     |
 | F3    | Safety Feedback UI           |        |
 | F4    | Styling And Verification     |        |
 
@@ -133,10 +133,10 @@ PM-004: Add reliability API client types
 
 **Deliverables:**
 
-- [ ] Add `useWorkspaceHealth`.
-- [ ] Add `useAuditEvents`.
-- [ ] Add refresh behavior after write and Git operations.
-- [ ] Add tests for loading, empty, and error states.
+- [x] Add `useWorkspaceHealth`.
+- [x] Add `useAuditEvents`.
+- [x] Add refresh behavior after write and Git operations.
+- [x] Add tests for loading, empty, and error states.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
