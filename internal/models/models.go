@@ -70,6 +70,25 @@ type SearchResult struct {
 	Score       int    `json:"score" yaml:"score"`
 }
 
+type SavedFilter struct {
+	ID          string         `json:"id" yaml:"id"`
+	Name        string         `json:"name" yaml:"name"`
+	Route       string         `json:"route" yaml:"route"`
+	WorkspaceID string         `json:"workspaceId,omitempty" yaml:"workspaceId,omitempty"`
+	Filters     map[string]any `json:"filters" yaml:"filters"`
+	CreatedAt   time.Time      `json:"createdAt" yaml:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt" yaml:"updatedAt"`
+}
+
+type RecentItem struct {
+	ItemID      string    `json:"itemId" yaml:"itemId"`
+	WorkspaceID string    `json:"workspaceId" yaml:"workspaceId"`
+	Title       string    `json:"title" yaml:"title"`
+	Subtitle    string    `json:"subtitle,omitempty" yaml:"subtitle,omitempty"`
+	Route       string    `json:"route" yaml:"route"`
+	OpenedAt    time.Time `json:"openedAt" yaml:"openedAt"`
+}
+
 type ItemStatus string
 
 const (

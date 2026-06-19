@@ -9,7 +9,7 @@ Add global search, saved filters, recent items, and quick navigation. Use the ex
 | Phase | Name                         | Status |
 |-------|------------------------------|--------|
 | B1    | Search Domain And Ranking    | ✅     |
-| B2    | Saved Filters And Recents    |        |
+| B2    | Saved Filters And Recents    | ✅     |
 | B3    | Search APIs                  |        |
 | B4    | Backend Tests                |        |
 | F1    | API Types And Client Methods |        |
@@ -45,10 +45,10 @@ PM-005: Add indexed item search domain
 
 **Deliverables:**
 
-- [ ] Add saved filter models.
-- [ ] Add recent item models.
-- [ ] Store saved filters and recents in app config YAML.
-- [ ] Add tests for create, list, delete, and ordering.
+- [x] Add saved filter models.
+- [x] Add recent item models.
+- [x] Store saved filters and recents in app config YAML.
+- [x] Add tests for create, list, delete, and ordering.
 
 **Verification:** `rtk go test ./...`
 
