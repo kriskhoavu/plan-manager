@@ -24,11 +24,12 @@ import {
 import { marked } from 'marked';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StatusMenu } from '../components/StatusMenu';
-import { api, statusLabels } from '../lib/api';
+import { ApiError, api, statusLabels } from '../lib/api';
 import type { FileContent, FileNode, GitChange, GitChangeStatus, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../lib/types';
 import { labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import type { DiffFile, DiffLine } from '../shared/domain/diff';
+import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'git';
@@ -61,6 +62,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const [tab, setTab] = useState<Tab>('preview');
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('info');
   const [error, setError] = useState('');
+  const [recoveryHint, setRecoveryHint] = useState('');
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(300);
@@ -76,8 +78,20 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     clearTimer(autoSaveSettledTimerRef);
   };
 
+  const showOperationError = (caught: unknown, fallback: string) => {
+    setError(caught instanceof Error ? caught.message : fallback);
+    setRecoveryHint(caught instanceof ApiError ? caught.recoveryHint ?? '' : '');
+  };
+
+  const showGitResultError = (result: { message?: string; recoveryHint?: string }) => {
+    if (!result.message) return;
+    setError(result.message);
+    setRecoveryHint(result.recoveryHint ?? '');
+  };
+
   useEffect(() => {
     setError('');
+    setRecoveryHint('');
     setFile(null);
     api.item(itemId).then(setPlan).catch((err: Error) => setError(err.message));
     api.files(itemId).then((tree) => {
@@ -250,9 +264,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
           : await api.gitPush(plan.workspaceId);
       setGitStatus(result.status);
       if (operation === 'pull') await onContentChanged?.();
-      if (!result.ok && result.message) setError(result.message);
+      if (!result.ok) showGitResultError(result);
+      else notifyReliabilityChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `${operation} failed`);
+      showOperationError(err, `${operation} failed`);
     } finally {
       setGitBusy('');
     }
@@ -268,9 +283,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
       setGitMessage('');
       setSelectedGitPaths([]);
       await onContentChanged?.();
-      if (!result.ok && result.message) setError(result.message);
+      if (!result.ok) showGitResultError(result);
+      else notifyReliabilityChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Commit failed');
+      showOperationError(err, 'Commit failed');
     } finally {
       setGitBusy('');
     }
@@ -285,9 +301,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
       setGitStatus(result.status);
       setBranchName('');
       await onContentChanged?.();
-      if (!result.ok && result.message) setError(result.message);
+      if (!result.ok) showGitResultError(result);
+      else notifyReliabilityChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Branch operation failed');
+      showOperationError(err, 'Branch operation failed');
     } finally {
       setGitBusy('');
     }
@@ -329,6 +346,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     setSavingFile(true);
     setAutoSaveState('saving');
     setError('');
+    setRecoveryHint('');
     try {
       const updated = await api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash });
       setFile(updated);
@@ -336,9 +354,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
       setAutoSaveState('saved');
       autoSaveSettledTimerRef.current = window.setTimeout(() => setAutoSaveState('idle'), 1600);
       scheduleFileChangeRefresh();
+      notifyReliabilityChanged();
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'File save failed');
+      showOperationError(err, 'File save failed');
       setAutoSaveState('error');
       return false;
     } finally {
@@ -384,8 +403,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
       setPlan(result.item);
       if (plan) await loadGitStatus(plan.workspaceId);
       await onContentChanged?.();
+      notifyReliabilityChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Metadata save failed');
+      showOperationError(err, 'Metadata save failed');
     } finally {
       setSavingMetadata(false);
     }
@@ -556,7 +576,18 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
                   </div>
                 )
               )}
-              {error && <p className="error">{error}</p>}
+              {error && (
+                <div className="operation-error">
+                  <p className="error">{error}</p>
+                  {recoveryHint && <p>{recoveryHint}</p>}
+                  {recoveryHint && file && (
+                    <div className="recovery-actions">
+                      <button className="secondary" type="button" onClick={() => void loadFile(file.id)}><RefreshCw size={14} /> Reload file</button>
+                      <button className="secondary" type="button" onClick={() => setTab('diff')}><GitCompare size={14} /> View diff</button>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
           {!rightCollapsed && (

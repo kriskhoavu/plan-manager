@@ -1,1 +1,1 @@
-export { api, editableStatusOrder, statusLabels, statusOrder } from '../shared/api';
+export { ApiError, api, editableStatusOrder, statusLabels, statusOrder } from '../shared/api';

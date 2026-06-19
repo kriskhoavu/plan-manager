@@ -14,7 +14,7 @@ Add local audit events, workspace health checks, safer operation feedback, and s
 | B4    | Reliability Tests            | ✅     |
 | F1    | API Types And Client Methods | ✅     |
 | F2    | Health And Audit State       | ✅     |
-| F3    | Safety Feedback UI           |        |
+| F3    | Safety Feedback UI           | ✅     |
 | F4    | Styling And Verification     |        |
 
 ## Backend Phases
@@ -155,10 +155,10 @@ PM-004: Add health and audit frontend state
 
 **Deliverables:**
 
-- [ ] Add workspace Health panel.
-- [ ] Add recent Activity panel.
-- [ ] Show recovery hints in Git and editor flows.
-- [ ] Add stale-file recovery actions.
+- [x] Add workspace Health panel.
+- [x] Add recent Activity panel.
+- [x] Show recovery hints in Git and editor flows.
+- [x] Add stale-file recovery actions.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

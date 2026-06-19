@@ -1,10 +1,12 @@
 import { type DragEvent, type Dispatch, type FormEvent, type SetStateAction, useState } from 'react';
 import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { api } from '../lib/api';
 import type { WorkspaceConfig, SourceStructureSettings, SourceStructureCard } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources } from '../features/workspaces/sourceSettings';
+import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
 export { inferCompatibilityFields, normalizeDroppedPath, parseSources };
 
@@ -59,6 +61,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     setMessage(`Scanning ${repo.name}`);
     try {
       const result = await api.scan(repo.id);
+      notifyReliabilityChanged();
       setMessage(`${result.itemCount} items indexed`);
       onChanged();
     } catch (err) {
@@ -173,6 +176,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
         cards: [withInferredCompatibilityFields(settingsEditor.card, settingsEditor.directory)]
       };
       const result = await api.saveSourceStructure(settingsEditor.repo.id, settingsEditor.directory, settings);
+      notifyReliabilityChanged();
       setSettingsEditor(null);
       setMessage(`Source structure saved; ${result.scan?.itemCount ?? 0} items indexed`);
       await onChanged();
@@ -296,6 +300,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                     </div>
                   </>
                 )}
+                <WorkspaceHealthPanel workspaceId={repo.id} />
               </article>
             ))}
             {workspaces.length === 0 && <div className="empty-inline repo-empty"><CheckCircle2 size={18} /> No workspaces registered.</div>}

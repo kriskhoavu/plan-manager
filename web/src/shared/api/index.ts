@@ -46,7 +46,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new ApiError(payload.error ?? `Request failed: ${res.status}`, payload.recoveryHint);
+    throw new ApiError(payload.error ?? payload.message ?? `Request failed: ${res.status}`, payload.recoveryHint);
   }
   return payload as T;
 }

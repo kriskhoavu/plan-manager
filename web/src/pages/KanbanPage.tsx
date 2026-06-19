@@ -4,11 +4,12 @@ import { ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertic
 import { marked } from 'marked';
 import { FileMenu } from '../components/FileMenu';
 import { StatusMenu } from '../components/StatusMenu';
-import { api, statusLabels, statusOrder } from '../lib/api';
+import { ApiError, api, statusLabels, statusOrder } from '../lib/api';
 import type { FileContent, FileNode, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemSummary, WorkspaceConfig } from '../lib/types';
 import { labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/kanban/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/kanban/filtering';
+import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
 type DrawerSideTab = 'info' | 'git';
@@ -75,6 +76,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
     setScanState('Scanning');
     try {
       const result = await api.scan(workspace.id);
+      notifyReliabilityChanged();
       setScanState(`${result.itemCount} items indexed`);
       onWorkspacesChanged();
       setPlans(await api.items(new URLSearchParams({ workspaceId: workspace.id })));
@@ -91,6 +93,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
   const movePlan = async (itemId: string, status: ItemStatus) => {
     try {
       await api.updateStatus(itemId, { status });
+      notifyReliabilityChanged();
       await onWorkspacesChanged();
       await reloadPlans();
     } catch (err) {
@@ -112,6 +115,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
         title: newPlanDraft.title.trim(),
         status: newPlanDraft.status
       });
+      notifyReliabilityChanged();
       setNewPlanOpen(false);
       setNewPlanDraft({ source: '', scope: '', identifier: '', title: '', status: 'draft' });
       await onWorkspacesChanged();
@@ -557,6 +561,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     setError('');
     try {
       const updated = await api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash });
+      notifyReliabilityChanged();
       setFile(updated);
       setSavedContent(content);
       setAutoSaveState('saved');
@@ -568,7 +573,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
       }, 600);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'File save failed');
+      setError(operationErrorMessage(err, 'File save failed'));
       setAutoSaveState('error');
       return false;
     } finally {
@@ -628,11 +633,12 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     setError('');
     try {
       const result = await api.saveMetadata(itemId, metadataDraft);
+      notifyReliabilityChanged();
       setPlan(result.item);
       await loadGitStatus(plan.workspaceId);
       await onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Metadata save failed');
+      setError(operationErrorMessage(err, 'Metadata save failed'));
     } finally {
       setSavingMetadata(false);
     }
@@ -649,13 +655,14 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
         : operation === 'pull'
           ? await api.gitPull(plan.workspaceId, { confirm })
           : await api.gitPush(plan.workspaceId);
+      notifyReliabilityChanged();
       setGitStatus(result.status);
       if (operation === 'pull') {
         await onChanged();
       }
       if (!result.ok && result.message) setError(result.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : `${operation} failed`);
+      setError(operationErrorMessage(err, `${operation} failed`));
     } finally {
       setGitBusy('');
     }
@@ -671,6 +678,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     setError('');
     try {
       const result = await api.gitCommit(plan.workspaceId, { message: gitMessage, paths: selectedGitPaths });
+      notifyReliabilityChanged();
       setGitStatus(result.status);
       setGitMessage('');
       setSelectedGitPaths([]);
@@ -678,7 +686,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
       api.diff(itemId).then((payload) => setDiff(payload.diff || 'No local changes.')).catch(() => setDiff('No diff available.'));
       if (!result.ok && result.message) setError(result.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Commit failed');
+      setError(operationErrorMessage(err, 'Commit failed'));
     } finally {
       setGitBusy('');
     }
@@ -690,12 +698,13 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
     setError('');
     try {
       const result = await api.createBranch(plan.workspaceId, { name: branchName.trim(), checkout: true });
+      notifyReliabilityChanged();
       setGitStatus(result.status);
       setBranchName('');
       await onChanged();
       if (!result.ok && result.message) setError(result.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Branch operation failed');
+      setError(operationErrorMessage(err, 'Branch operation failed'));
     } finally {
       setGitBusy('');
     }
@@ -927,6 +936,12 @@ function clearTimeoutRef(ref: MutableRefObject<number | null>) {
   if (ref.current === null) return;
   window.clearTimeout(ref.current);
   ref.current = null;
+}
+
+function operationErrorMessage(caught: unknown, fallback: string) {
+  const message = caught instanceof Error ? caught.message : fallback;
+  const hint = caught instanceof ApiError ? caught.recoveryHint : '';
+  return [message, hint].filter(Boolean).join(' ');
 }
 
 function unique(values: string[]): string[] {

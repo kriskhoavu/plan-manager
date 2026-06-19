@@ -9,6 +9,7 @@ import { KanbanPage } from './pages/KanbanPage';
 import { ItemsPage } from './pages/ItemsPage';
 import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
+import { ActivityPanel } from './components/ReliabilityPanels';
 import { labels } from './lib/vocabulary';
 
 export function App() {
@@ -28,6 +29,7 @@ export function App() {
     lastSync
   } = useAppState();
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -135,7 +137,7 @@ export function App() {
           )}
         </div>
         <div className="topbar-actions">
-          <button className="icon-button topbar-icon" type="button" aria-label="Notifications">
+          <button className="icon-button topbar-icon" type="button" aria-label="Recent activity" aria-expanded={activityOpen} onClick={() => setActivityOpen((open) => !open)}>
             <Bell size={17} />
           </button>
           <button className="icon-button topbar-icon" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label="Toggle theme">
@@ -144,6 +146,8 @@ export function App() {
           <span className="user-avatar" aria-label="Current user">K</span>
         </div>
       </header>
+
+      {activityOpen && <ActivityPanel workspaceId={activeRepo?.id} onClose={() => setActivityOpen(false)} />}
 
       <main className="main-content">
         {route.name === 'kanban' && (
