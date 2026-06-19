@@ -15,7 +15,7 @@ Refactor Plan Manager architecture in small behavior-preserving phases. Each pha
 | F1    | Frontend App State And API Modules      | Done   |
 | F2    | Frontend Feature Hooks And Components   | Done   |
 | F3    | Frontend Styles And Render Performance  | Done   |
-| D1    | Architecture Documentation Finalization |        |
+| D1    | Architecture Documentation Finalization | Done   |
 
 ## Phase A1: Characterization And Baseline
 
@@ -183,10 +183,10 @@ PM-003: Organize frontend styles and render work
 
 **Deliverables:**
 
-- [ ] Update top-level `ARCHITECTURE.md` to reflect the final package structure.
-- [ ] Update PM-003 docs with any implementation decisions made during migration.
-- [ ] Add developer notes for package dependency rules and frontend module ownership.
-- [ ] Confirm all acceptance criteria are met.
+- [x] Update top-level `ARCHITECTURE.md` to reflect the final package structure.
+- [x] Update PM-003 docs with any implementation decisions made during migration.
+- [x] Add developer notes for package dependency rules and frontend module ownership.
+- [x] Confirm all acceptance criteria are met.
 
 **Verification:** `rtk go test ./... && rtk npm run typecheck && rtk npm test -- --run && rtk npm run build`
 

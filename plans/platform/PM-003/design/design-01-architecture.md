@@ -38,11 +38,10 @@ large pages
 
 ```text
 internal/app
-  -> internal/httpapi
+  -> internal/api
      -> internal/application/*
-        -> internal/domain/*
-        -> internal/storage/*
-        -> internal/files
+        -> internal/security/pathguard
+        -> internal/registry, internal/itemindex, internal/fileaccess, internal/itemwriter
         -> internal/scanner
         -> internal/gitadapter
 
@@ -67,11 +66,22 @@ web/src/app
 ## Dependency Rules
 
 - HTTP packages may depend on application packages.
-- Application packages may depend on domain and infrastructure interfaces.
-- Domain packages must not depend on HTTP, storage, scanner, Git, or React.
+- Application packages may depend on scanner, registry, index, file access, writer, Git, pathguard, and models.
+- Shared guard logic belongs in `internal/security/pathguard`.
 - Infrastructure packages must not depend on HTTP handlers.
 - Frontend features may depend on shared modules.
 - Shared frontend modules must not depend on feature modules.
+
+## Final PM-003 Structure Notes
+
+- `internal/api` remains the delivery package to avoid route and import churn.
+- `internal/application/workspace`, `internal/application/item`, and `internal/application/git` own backend workflow orchestration.
+- `internal/security/pathguard` owns reusable safe path checks.
+- `internal/scanner/source_settings_matcher.go` owns configured source matching.
+- `internal/scanner/metadata_parser.go` owns item metadata parsing.
+- `web/src/app` owns routing and app state.
+- `web/src/shared/api` owns the API implementation; `web/src/lib/api.ts` remains the compatibility facade.
+- `web/src/features` owns extracted feature helper logic.
 
 ## Test Strategy
 
@@ -93,4 +103,3 @@ web/src/app
 | Coupling is reduced               | Directional package rules and service interfaces                             |
 | Performance improves where useful | Add measured scanner, Git, and render optimizations after structure improves |
 | Architecture documentation exists | PM-003 plan docs and updated top-level architecture docs after migration     |
-
