@@ -334,6 +334,46 @@ func TestWorkspaceFileSaveDiffRevertAndErrorMapping(t *testing.T) {
 	}
 }
 
+func TestWorkspaceProductivityRoutes(t *testing.T) {
+	apiHandler, workspace, _, auditStore := reliabilityTestAPI(t)
+	request := func(method, path, body string) *httptest.ResponseRecorder {
+		response := httptest.NewRecorder()
+		apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(method, path, strings.NewReader(body)))
+		return response
+	}
+
+	directory := request(http.MethodPost, "/api/workspaces/"+workspace.ID+"/directories", `{"parentPath":"plans","name":"guides"}`)
+	if directory.Code != http.StatusOK {
+		t.Fatalf("directory status=%d body=%s", directory.Code, directory.Body.String())
+	}
+	created := request(http.MethodPost, "/api/workspaces/"+workspace.ID+"/files", `{"parentPath":"plans/guides","name":"start.md","content":"# Start\n"}`)
+	if created.Code != http.StatusOK {
+		t.Fatalf("create status=%d body=%s", created.Code, created.Body.String())
+	}
+	search := request(http.MethodGet, "/api/workspaces/files/search?q=start&workspaceId="+workspace.ID, "")
+	var searchResult models.WorkspacePathSearchResponse
+	if err := json.Unmarshal(search.Body.Bytes(), &searchResult); err != nil || search.Code != http.StatusOK || len(searchResult.Results) != 1 {
+		t.Fatalf("search status=%d result=%#v err=%v", search.Code, searchResult, err)
+	}
+	renamed := request(http.MethodPost, "/api/workspaces/"+workspace.ID+"/paths/rename", `{"path":"plans/guides/start.md","destinationPath":"plans/guides/intro.md"}`)
+	if renamed.Code != http.StatusOK {
+		t.Fatalf("rename status=%d body=%s", renamed.Code, renamed.Body.String())
+	}
+	conflict := request(http.MethodPost, "/api/workspaces/"+workspace.ID+"/paths/rename", `{"path":"plans/guides/intro.md","destinationPath":"plans/guides/intro.md"}`)
+	if conflict.Code != http.StatusConflict {
+		t.Fatalf("conflict status=%d body=%s", conflict.Code, conflict.Body.String())
+	}
+	states := request(http.MethodGet, "/api/workspaces/"+workspace.ID+"/git/path-status", "")
+	var pathStates []models.WorkspacePathGitState
+	if err := json.Unmarshal(states.Body.Bytes(), &pathStates); err != nil || states.Code != http.StatusOK || len(pathStates) == 0 {
+		t.Fatalf("states status=%d states=%#v err=%v", states.Code, pathStates, err)
+	}
+	events, err := auditStore.Recent(10)
+	if err != nil || len(events) < 3 {
+		t.Fatalf("audit events=%#v err=%v", events, err)
+	}
+}
+
 func TestGitPullDirtyTreeReturnsRecoveryHint(t *testing.T) {
 	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
 	if err := os.WriteFile(filepath.Join(workspace.Path, "plans", "dirty.md"), []byte("dirty"), 0o644); err != nil {

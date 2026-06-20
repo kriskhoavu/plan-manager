@@ -10,7 +10,7 @@ Add bounded path search, Git tree decorations, guarded Markdown and directory cr
 |-------|----------------------------------|--------|
 | B1    | Guarded Create And Rename Domain | ✅     |
 | B2    | Path Search And Git State Domain | ✅     |
-| B3    | Application Service And APIs     |        |
+| B3    | Application Service And APIs     | ✅     |
 | B4    | Backend Safety And Scale Tests   |        |
 | F1    | Types And API Clients            |        |
 | F2    | Search, Git, And Mutation State  |        |
@@ -67,12 +67,12 @@ PM-008: Add workspace path search and Git state
 
 **Deliverables:**
 
-- [ ] Add search, create, rename, and Git state service methods.
-- [ ] Add audit events for successful and blocked mutations.
-- [ ] Refresh configured sources only when affected.
-- [ ] Add all proposed HTTP routes and error mapping.
-- [ ] Preserve PM-007 route contracts.
-- [ ] Add application and API regression tests.
+- [x] Add search, create, rename, and Git state service methods.
+- [x] Add audit events for successful and blocked mutations.
+- [x] Refresh configured sources only when affected.
+- [x] Add all proposed HTTP routes and error mapping.
+- [x] Preserve PM-007 route contracts.
+- [x] Add application and API regression tests.
 
 **Verification:** `rtk go test ./internal/application/workspacefiles ./internal/api ./internal/app`
 

@@ -17,6 +17,10 @@ func (f fakeRegistry) Get(id string) (models.WorkspaceConfig, bool, error) {
 	return f.workspace, id == f.workspace.ID, nil
 }
 
+func (f fakeRegistry) List() ([]models.WorkspaceConfig, error) {
+	return []models.WorkspaceConfig{f.workspace}, nil
+}
+
 type fakeGit struct {
 	diff     string
 	reverted []string
@@ -26,6 +30,9 @@ func (f *fakeGit) Diff(_, _ string) (string, error) { return f.diff, nil }
 func (f *fakeGit) RevertPaths(_ string, paths []string) error {
 	f.reverted = append([]string(nil), paths...)
 	return nil
+}
+func (f *fakeGit) PathStates(_, _ string) ([]models.WorkspacePathGitState, error) {
+	return []models.WorkspacePathGitState{{Path: "plans/item.md", Status: models.GitChangeModified}}, nil
 }
 
 type fakeAudit struct{ events []models.AuditEvent }
@@ -112,6 +119,50 @@ func TestReadRejectsBinaryAndSaveRejectsNonMarkdown(t *testing.T) {
 	_, err := service.Save(workspace.ID, models.WorkspaceFileSaveInput{Path: "notes.txt", Content: "new", ExpectedHash: fileaccess.ContentHash(data)})
 	if !errors.Is(err, workspaceaccess.ErrMarkdownOnly) {
 		t.Fatalf("text save error = %v", err)
+	}
+}
+
+func TestSearchAndPathStates(t *testing.T) {
+	service, workspace, _, _ := newTestService(t)
+	search, err := service.Search("item", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(search.Results) != 1 || search.Results[0].Path != "plans/item.md" {
+		t.Fatalf("search = %#v", search)
+	}
+	states, err := service.PathStates(workspace.ID)
+	if err != nil || len(states) != 1 || states[0].Status != models.GitChangeModified {
+		t.Fatalf("states = %#v, %v", states, err)
+	}
+}
+
+func TestCreateAndRenameAuditAndRefreshConfiguredSources(t *testing.T) {
+	service, workspace, audit, refresher := newTestService(t)
+	created, err := service.CreateMarkdown(workspace.ID, models.WorkspaceFileCreateInput{ParentPath: "plans", Name: "new.md", Content: "new"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	renamed, err := service.Rename(workspace.ID, models.WorkspacePathRenameInput{Path: "plans/new.md", DestinationPath: "plans/renamed.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !created.Refreshed || !renamed.Refreshed || refresher.calls != 2 {
+		t.Fatalf("results = %#v %#v, refresh calls = %d", created, renamed, refresher.calls)
+	}
+	if len(audit.events) != 2 || audit.events[1].Operation != "workspace_path_rename" || len(audit.events[1].Paths) != 2 {
+		t.Fatalf("audit = %#v", audit.events)
+	}
+}
+
+func TestBlockedMutationIsAuditedWithoutRefresh(t *testing.T) {
+	service, workspace, audit, refresher := newTestService(t)
+	_, err := service.CreateDirectory(workspace.ID, models.WorkspaceDirectoryCreateInput{ParentPath: "plans", Name: "../escape"})
+	if !errors.Is(err, workspaceaccess.ErrInvalidName) {
+		t.Fatalf("error = %v", err)
+	}
+	if len(audit.events) != 1 || audit.events[0].Status != models.AuditStatusBlocked || refresher.calls != 0 {
+		t.Fatalf("audit = %#v, refresh calls = %d", audit.events, refresher.calls)
 	}
 }
 

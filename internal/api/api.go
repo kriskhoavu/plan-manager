@@ -89,10 +89,15 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)
 	mux.HandleFunc("PUT /api/workspaces/{id}/source-structure", a.saveSourceStructure)
 	mux.HandleFunc("GET /api/workspaces/{id}/tree", a.workspaceTree)
+	mux.HandleFunc("GET /api/workspaces/files/search", a.workspacePathSearch)
 	mux.HandleFunc("GET /api/workspaces/{id}/files", a.workspaceFile)
 	mux.HandleFunc("PUT /api/workspaces/{id}/files", a.saveWorkspaceFile)
+	mux.HandleFunc("POST /api/workspaces/{id}/files", a.createWorkspaceFile)
+	mux.HandleFunc("POST /api/workspaces/{id}/directories", a.createWorkspaceDirectory)
+	mux.HandleFunc("POST /api/workspaces/{id}/paths/rename", a.renameWorkspacePath)
 	mux.HandleFunc("GET /api/workspaces/{id}/files/diff", a.workspaceFileDiff)
 	mux.HandleFunc("POST /api/workspaces/{id}/files/revert", a.revertWorkspaceFile)
+	mux.HandleFunc("GET /api/workspaces/{id}/git/path-status", a.workspacePathGitStates)
 	mux.HandleFunc("GET /api/items", a.listItems)
 	mux.HandleFunc("GET /api/items/{id}", a.itemDetail)
 	mux.HandleFunc("GET /api/items/{id}/files", a.itemFiles)
@@ -360,6 +365,12 @@ func (a *API) workspaceTree(w http.ResponseWriter, r *http.Request) {
 	respondWorkspaceFileResult(w, result, err)
 }
 
+func (a *API) workspacePathSearch(w http.ResponseWriter, r *http.Request) {
+	includeIgnored, _ := strconv.ParseBool(r.URL.Query().Get("includeIgnored"))
+	result, err := a.workspaceFiles.Search(r.URL.Query().Get("q"), r.URL.Query().Get("workspaceId"), includeIgnored)
+	respondWorkspaceFileResult(w, result, err)
+}
+
 func (a *API) workspaceFile(w http.ResponseWriter, r *http.Request) {
 	result, err := a.workspaceFiles.Read(r.PathValue("id"), r.URL.Query().Get("path"))
 	respondWorkspaceFileResult(w, result, err)
@@ -372,6 +383,41 @@ func (a *API) saveWorkspaceFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := a.workspaceFiles.Save(r.PathValue("id"), input)
+	respondWorkspaceFileResult(w, result, err)
+}
+
+func (a *API) createWorkspaceFile(w http.ResponseWriter, r *http.Request) {
+	var input models.WorkspaceFileCreateInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.workspaceFiles.CreateMarkdown(r.PathValue("id"), input)
+	respondWorkspaceFileResult(w, result, err)
+}
+
+func (a *API) createWorkspaceDirectory(w http.ResponseWriter, r *http.Request) {
+	var input models.WorkspaceDirectoryCreateInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.workspaceFiles.CreateDirectory(r.PathValue("id"), input)
+	respondWorkspaceFileResult(w, result, err)
+}
+
+func (a *API) renameWorkspacePath(w http.ResponseWriter, r *http.Request) {
+	var input models.WorkspacePathRenameInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.workspaceFiles.Rename(r.PathValue("id"), input)
+	respondWorkspaceFileResult(w, result, err)
+}
+
+func (a *API) workspacePathGitStates(w http.ResponseWriter, r *http.Request) {
+	result, err := a.workspaceFiles.PathStates(r.PathValue("id"))
 	respondWorkspaceFileResult(w, result, err)
 }
 
@@ -696,6 +742,8 @@ func respondWorkspaceFileResult(w http.ResponseWriter, data any, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, workspaceaccess.ErrHashRequired), errors.Is(err, workspaceaccess.ErrStaleContent):
 		writeError(w, http.StatusConflict, workspaceaccess.ErrStaleContent.Error())
+	case errors.Is(err, workspaceaccess.ErrDestinationExists):
+		writeError(w, http.StatusConflict, err.Error())
 	default:
 		writeError(w, http.StatusBadRequest, err.Error())
 	}
