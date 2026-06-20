@@ -5,18 +5,20 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
+
+	"plan-manager/internal/models"
 )
 
-type FileKind string
+type FileKind = models.FileKind
 
 const (
-	FileKindMarkdown    FileKind = "markdown"
-	FileKindHTML        FileKind = "html"
-	FileKindJSON        FileKind = "json"
-	FileKindYAML        FileKind = "yaml"
-	FileKindCode        FileKind = "code"
-	FileKindText        FileKind = "text"
-	FileKindUnsupported FileKind = "unsupported"
+	FileKindMarkdown    = models.FileKindMarkdown
+	FileKindHTML        = models.FileKindHTML
+	FileKindJSON        = models.FileKindJSON
+	FileKindYAML        = models.FileKindYAML
+	FileKindCode        = models.FileKindCode
+	FileKindText        = models.FileKindText
+	FileKindUnsupported = models.FileKindUnsupported
 
 	RichPreviewThresholdBytes int64 = 1 << 20
 	MaxTextResponseBytes      int64 = 2 << 20

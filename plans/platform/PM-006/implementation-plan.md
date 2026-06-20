@@ -20,7 +20,7 @@ All code and UI text must use these names:
 | Phase | Name                                 | Status |
 |-------|--------------------------------------|--------|
 | B1    | File Classification And Limits       | ✅     |
-| B2    | Viewer API Metadata                  |        |
+| B2    | Viewer API Metadata                  | ✅     |
 | B3    | Guarded Read Integration             |        |
 | B4    | Backend Regression Tests             |        |
 | F1    | Viewer Types And Rendering Pipeline  |        |
@@ -57,10 +57,10 @@ PM-006: Add viewer file classification
 
 **Deliverables:**
 
-- [ ] Add `kind`, `sizeBytes`, `truncated`, and `editable` to `models.FileContent`.
-- [ ] Keep current JSON fields and route shape stable.
-- [ ] Add frontend-compatible constants and response fixtures.
-- [ ] Document backward compatibility in API tests.
+- [x] Add `kind`, `sizeBytes`, `truncated`, and `editable` to `models.FileContent`.
+- [x] Keep current JSON fields and route shape stable.
+- [x] Add frontend-compatible constants and response fixtures.
+- [x] Document backward compatibility in model contract tests.
 
 **Verification:** `rtk go test ./internal/models ./internal/api`
 

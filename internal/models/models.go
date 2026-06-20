@@ -192,12 +192,28 @@ type FileNode struct {
 	Children []FileNode `json:"children,omitempty" yaml:"children,omitempty"`
 }
 
+type FileKind string
+
+const (
+	FileKindMarkdown    FileKind = "markdown"
+	FileKindHTML        FileKind = "html"
+	FileKindJSON        FileKind = "json"
+	FileKindYAML        FileKind = "yaml"
+	FileKindCode        FileKind = "code"
+	FileKindText        FileKind = "text"
+	FileKindUnsupported FileKind = "unsupported"
+)
+
 type FileContent struct {
-	ID       string `json:"id" yaml:"id"`
-	Path     string `json:"path" yaml:"path"`
-	Content  string `json:"content" yaml:"content"`
-	Language string `json:"language" yaml:"language"`
-	Hash     string `json:"hash" yaml:"hash"`
+	ID        string   `json:"id" yaml:"id"`
+	Path      string   `json:"path" yaml:"path"`
+	Content   string   `json:"content" yaml:"content"`
+	Language  string   `json:"language" yaml:"language"`
+	Hash      string   `json:"hash" yaml:"hash"`
+	Kind      FileKind `json:"kind" yaml:"kind"`
+	SizeBytes int64    `json:"sizeBytes" yaml:"sizeBytes"`
+	Truncated bool     `json:"truncated,omitempty" yaml:"truncated,omitempty"`
+	Editable  bool     `json:"editable" yaml:"editable"`
 }
 
 type ScanWarning struct {
