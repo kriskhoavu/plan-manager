@@ -252,6 +252,30 @@ type WorkspaceFileWriteResult struct {
 	Refreshed bool        `json:"refreshed" yaml:"refreshed"`
 }
 
+type WorkspaceFileCreateInput struct {
+	ParentPath string `json:"parentPath" yaml:"parentPath"`
+	Name       string `json:"name" yaml:"name"`
+	Content    string `json:"content" yaml:"content"`
+}
+
+type WorkspaceDirectoryCreateInput struct {
+	ParentPath string `json:"parentPath" yaml:"parentPath"`
+	Name       string `json:"name" yaml:"name"`
+}
+
+type WorkspacePathRenameInput struct {
+	Path            string `json:"path" yaml:"path"`
+	DestinationPath string `json:"destinationPath" yaml:"destinationPath"`
+}
+
+type WorkspacePathMutationResult struct {
+	WorkspaceID      string   `json:"workspaceId" yaml:"workspaceId"`
+	Path             string   `json:"path" yaml:"path"`
+	Type             string   `json:"type" yaml:"type"`
+	InvalidatedPaths []string `json:"invalidatedPaths" yaml:"invalidatedPaths"`
+	Refreshed        bool     `json:"refreshed" yaml:"refreshed"`
+}
+
 type ScanWarning struct {
 	ItemPath string `json:"itemPath,omitempty" yaml:"itemPath,omitempty"`
 	Message  string `json:"message" yaml:"message"`

@@ -8,7 +8,7 @@ Add bounded path search, Git tree decorations, guarded Markdown and directory cr
 
 | Phase | Name                             | Status |
 |-------|----------------------------------|--------|
-| B1    | Guarded Create And Rename Domain |        |
+| B1    | Guarded Create And Rename Domain | ✅     |
 | B2    | Path Search And Git State Domain |        |
 | B3    | Application Service And APIs     |        |
 | B4    | Backend Safety And Scale Tests   |        |
@@ -23,12 +23,12 @@ Add bounded path search, Git tree decorations, guarded Markdown and directory cr
 
 **Deliverables:**
 
-- [ ] Add create, rename, and mutation result models.
-- [ ] Add single-segment name validation.
-- [ ] Add exclusive Markdown creation and one-directory creation.
-- [ ] Add guarded same-workspace rename without overwrite.
-- [ ] Return precise parent cache invalidation paths.
-- [ ] Cover traversal, `.git`, symlink, format, collision, and root safeguards.
+- [x] Add create, rename, and mutation result models.
+- [x] Add single-segment name validation.
+- [x] Add exclusive Markdown creation and one-directory creation.
+- [x] Add guarded same-workspace rename without overwrite.
+- [x] Return precise parent cache invalidation paths.
+- [x] Cover traversal, `.git`, symlink, format, collision, and root safeguards.
 
 **Verification:** `rtk go test ./internal/workspacefiles ./internal/security/pathguard`
 
