@@ -11,7 +11,7 @@ Add bounded path search, Git tree decorations, guarded Markdown and directory cr
 | B1    | Guarded Create And Rename Domain | ✅     |
 | B2    | Path Search And Git State Domain | ✅     |
 | B3    | Application Service And APIs     | ✅     |
-| B4    | Backend Safety And Scale Tests   |        |
+| B4    | Backend Safety And Scale Tests   | ✅     |
 | F1    | Types And API Clients            |        |
 | F2    | Search, Git, And Mutation State  |        |
 | F3    | Explorer Productivity UI         |        |
@@ -89,11 +89,11 @@ PM-008: Add Explorer productivity APIs
 
 **Deliverables:**
 
-- [ ] Cover search result and visited-entry limits.
-- [ ] Cover ignored and outside-symlink traversal.
-- [ ] Cover exclusive create and no-overwrite rename behavior.
-- [ ] Cover audit and targeted refresh results.
-- [ ] Run the complete backend suite.
+- [x] Cover search result and visited-entry limits.
+- [x] Cover ignored and outside-symlink traversal.
+- [x] Cover exclusive create and no-overwrite rename behavior.
+- [x] Cover audit and targeted refresh results.
+- [x] Run the complete backend suite.
 
 **Verification:** `rtk go test ./...`
 

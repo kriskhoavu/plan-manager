@@ -30,15 +30,17 @@ type IgnoreChecker interface {
 }
 
 type Access struct {
-	ignore IgnoreChecker
+	ignore            IgnoreChecker
+	searchResultLimit int
+	searchEntryLimit  int
 }
 
 func New() *Access {
-	return &Access{ignore: gitIgnoreChecker{}}
+	return &Access{ignore: gitIgnoreChecker{}, searchResultLimit: MaxSearchResults, searchEntryLimit: MaxSearchEntries}
 }
 
 func NewWithIgnoreChecker(ignore IgnoreChecker) *Access {
-	return &Access{ignore: ignore}
+	return &Access{ignore: ignore, searchResultLimit: MaxSearchResults, searchEntryLimit: MaxSearchEntries}
 }
 
 func (a *Access) List(workspace models.WorkspaceConfig, path string, includeIgnored bool) (models.WorkspaceDirectoryListing, error) {

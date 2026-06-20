@@ -28,6 +28,13 @@ func (a *Access) Search(workspace models.WorkspaceConfig, query string, includeI
 	type directory struct{ path, full string }
 	queue := []directory{{path: "", full: realRoot}}
 	visited := 0
+	resultLimit, entryLimit := a.searchResultLimit, a.searchEntryLimit
+	if resultLimit <= 0 {
+		resultLimit = MaxSearchResults
+	}
+	if entryLimit <= 0 {
+		entryLimit = MaxSearchEntries
+	}
 	lowerQuery := strings.ToLower(query)
 	for len(queue) > 0 {
 		current := queue[0]
@@ -50,7 +57,7 @@ func (a *Access) Search(workspace models.WorkspaceConfig, query string, includeI
 		}
 		for i, entry := range entries {
 			visited++
-			if visited > MaxSearchEntries {
+			if visited > entryLimit {
 				response.Truncated = true
 				return sortSearchResponse(response, query), nil
 			}
@@ -71,7 +78,7 @@ func (a *Access) Search(workspace models.WorkspaceConfig, query string, includeI
 					ID: workspace.ID + ":" + workspaceFileID(path), WorkspaceID: workspace.ID, WorkspaceName: workspace.Name,
 					Name: entry.Name(), Path: path, Type: node.Type, Ignored: isIgnored, Context: parentRelative(path),
 				})
-				if len(response.Results) == MaxSearchResults {
+				if len(response.Results) == resultLimit {
 					response.Truncated = true
 					return sortSearchResponse(response, query), nil
 				}

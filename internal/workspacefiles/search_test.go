@@ -72,3 +72,25 @@ func TestSearchReturnsEmptyForBlankQuery(t *testing.T) {
 		t.Fatalf("Search blank = %#v, %v", result, err)
 	}
 }
+
+func TestSearchReportsResultAndTraversalTruncation(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"match-1.md", "match-2.md", "match-3.md", "match-4.md", "other.md"} {
+		mustWrite(t, filepath.Join(root, name), name)
+	}
+	workspace := models.WorkspaceConfig{ID: "ws", Path: root}
+
+	resultLimited := NewWithIgnoreChecker(nil)
+	resultLimited.searchResultLimit = 2
+	result, err := resultLimited.Search(workspace, "match", false)
+	if err != nil || !result.Truncated || len(result.Results) != 2 {
+		t.Fatalf("result-limited search = %#v, %v", result, err)
+	}
+
+	entryLimited := NewWithIgnoreChecker(nil)
+	entryLimited.searchEntryLimit = 2
+	result, err = entryLimited.Search(workspace, "missing", false)
+	if err != nil || !result.Truncated {
+		t.Fatalf("entry-limited search = %#v, %v", result, err)
+	}
+}
