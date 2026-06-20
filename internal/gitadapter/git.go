@@ -131,6 +131,20 @@ func (g *GitAdapter) Status(workspaceID, workspacePath string) (models.GitStatus
 	return status, nil
 }
 
+func (g *GitAdapter) PathStates(workspaceID, workspacePath string) ([]models.WorkspacePathGitState, error) {
+	status, err := g.Status(workspaceID, workspacePath)
+	if err != nil {
+		return nil, err
+	}
+	states := make([]models.WorkspacePathGitState, 0, len(status.Changes))
+	for _, change := range status.Changes {
+		states = append(states, models.WorkspacePathGitState{
+			Path: change.Path, OldPath: change.OldPath, Status: change.Status, Staged: change.Staged, Conflict: change.Conflict,
+		})
+	}
+	return states, nil
+}
+
 func (g *GitAdapter) Fetch(workspacePath string) error {
 	_, err := g.run(workspacePath, "fetch", "--all", "--prune")
 	return err

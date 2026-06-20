@@ -276,6 +276,30 @@ type WorkspacePathMutationResult struct {
 	Refreshed        bool     `json:"refreshed" yaml:"refreshed"`
 }
 
+type WorkspacePathSearchResult struct {
+	ID            string `json:"id" yaml:"id"`
+	WorkspaceID   string `json:"workspaceId" yaml:"workspaceId"`
+	WorkspaceName string `json:"workspaceName" yaml:"workspaceName"`
+	Name          string `json:"name" yaml:"name"`
+	Path          string `json:"path" yaml:"path"`
+	Type          string `json:"type" yaml:"type"`
+	Ignored       bool   `json:"ignored" yaml:"ignored"`
+	Context       string `json:"context" yaml:"context"`
+}
+
+type WorkspacePathSearchResponse struct {
+	Results   []WorkspacePathSearchResult `json:"results" yaml:"results"`
+	Truncated bool                        `json:"truncated" yaml:"truncated"`
+}
+
+type WorkspacePathGitState struct {
+	Path     string          `json:"path" yaml:"path"`
+	OldPath  string          `json:"oldPath,omitempty" yaml:"oldPath,omitempty"`
+	Status   GitChangeStatus `json:"status" yaml:"status"`
+	Staged   bool            `json:"staged" yaml:"staged"`
+	Conflict bool            `json:"conflict" yaml:"conflict"`
+}
+
 type ScanWarning struct {
 	ItemPath string `json:"itemPath,omitempty" yaml:"itemPath,omitempty"`
 	Message  string `json:"message" yaml:"message"`

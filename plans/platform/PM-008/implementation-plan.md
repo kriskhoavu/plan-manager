@@ -9,7 +9,7 @@ Add bounded path search, Git tree decorations, guarded Markdown and directory cr
 | Phase | Name                             | Status |
 |-------|----------------------------------|--------|
 | B1    | Guarded Create And Rename Domain | ✅     |
-| B2    | Path Search And Git State Domain |        |
+| B2    | Path Search And Git State Domain | ✅     |
 | B3    | Application Service And APIs     |        |
 | B4    | Backend Safety And Scale Tests   |        |
 | F1    | Types And API Clients            |        |
@@ -45,12 +45,12 @@ PM-008: Add guarded workspace path mutations
 
 **Deliverables:**
 
-- [ ] Add bounded search models and traversal.
-- [ ] Batch ignored-path checks by directory.
-- [ ] Skip `.git` and outside symlinks.
-- [ ] Add deterministic result ordering and truncation.
-- [ ] Normalize Git changes into path state responses.
-- [ ] Cover unloaded, ignored, deep, large, and renamed paths.
+- [x] Add bounded search models and traversal.
+- [x] Batch ignored-path checks by directory.
+- [x] Skip `.git` and outside symlinks.
+- [x] Add deterministic result ordering and truncation.
+- [x] Normalize Git changes into path state responses.
+- [x] Cover unloaded, ignored, deep, large, and renamed paths.
 
 **Verification:** `rtk go test ./internal/workspacefiles ./internal/gitadapter`
 

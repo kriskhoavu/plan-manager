@@ -1,6 +1,9 @@
 package gitadapter
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"plan-manager/internal/models"
@@ -18,6 +21,23 @@ func TestParseBranchLine(t *testing.T) {
 	}
 	if status.Ahead != 2 || status.Behind != 1 {
 		t.Fatalf("ahead/behind = %d/%d", status.Ahead, status.Behind)
+	}
+}
+
+func TestPathStatesNormalizesWorkspaceChanges(t *testing.T) {
+	root := t.TempDir()
+	if output, err := exec.Command("git", "init", "-b", "main", root).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	if err := os.WriteFile(filepath.Join(root, "new.md"), []byte("new"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	states, err := New().PathStates("ws", root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(states) != 1 || states[0].Path != "new.md" || states[0].Status != models.GitChangeUntracked {
+		t.Fatalf("states = %#v", states)
 	}
 }
 
