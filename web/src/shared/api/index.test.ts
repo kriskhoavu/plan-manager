@@ -34,6 +34,21 @@ describe('shared api facade', () => {
     });
   });
 
+  it('normalizes workspace directory listings and encodes file paths', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ workspaceId: 'w1', entries: [{ id: 'one', name: 'one', path: 'one', type: 'directory' }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ path: 'docs/a b.md' }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(api.workspaceTree('w1', '', true)).resolves.toEqual({
+      workspaceId: 'w1', path: '', hiddenCount: 0,
+      entries: [{ id: 'one', name: 'one', path: 'one', type: 'directory', hasChildren: false, ignored: false, hidden: false, editable: false }]
+    });
+    await api.workspaceFile('w1', 'docs/a b.md');
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/workspaces/w1/tree?path=&includeIgnored=true', expect.any(Object));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/workspaces/w1/files?path=docs%2Fa%20b.md', expect.any(Object));
+  });
+
   it('normalizes audit and workspace health responses', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({

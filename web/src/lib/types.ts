@@ -166,6 +166,42 @@ export interface FileSaveInput {
   expectedHash?: string;
 }
 
+export interface WorkspaceTreeEntry {
+  id: string;
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  hasChildren: boolean;
+  ignored: boolean;
+  hidden: boolean;
+  kind?: FileKind;
+  language?: string;
+  sizeBytes?: number;
+  editable: boolean;
+}
+
+export interface WorkspaceDirectoryListing {
+  workspaceId: string;
+  path: string;
+  entries: WorkspaceTreeEntry[];
+  hiddenCount: number;
+}
+
+export interface WorkspaceFileSaveInput {
+  path: string;
+  content: string;
+  expectedHash: string;
+}
+
+export interface WorkspaceFileRevertInput {
+  path: string;
+}
+
+export interface WorkspaceFileWriteResult {
+  file: FileContent;
+  refreshed: boolean;
+}
+
 export interface ItemMetadataUpdateInput {
   title?: string;
   scope?: string;

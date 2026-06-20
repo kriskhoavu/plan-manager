@@ -23,6 +23,11 @@ import type {
   WorkspaceConfig,
   WorkspaceInput,
   WorkspaceHealth,
+  WorkspaceDirectoryListing,
+  WorkspaceFileRevertInput,
+  WorkspaceFileSaveInput,
+  WorkspaceFileWriteResult,
+  WorkspaceTreeEntry,
   SourceStructureSettings,
   ScanResult,
   SourceSettingsResult,
@@ -89,6 +94,20 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(settings)
     }),
+  workspaceTree: async (workspaceId: string, path = '', includeIgnored = false) => {
+    const query = new URLSearchParams({ path });
+    if (includeIgnored) query.set('includeIgnored', 'true');
+    const listing = await request<WorkspaceDirectoryListing>(`/api/workspaces/${encodeURIComponent(workspaceId)}/tree?${query.toString()}`);
+    return normalizeWorkspaceDirectoryListing(listing);
+  },
+  workspaceFile: (workspaceId: string, path: string) =>
+    request<FileContent>(`/api/workspaces/${encodeURIComponent(workspaceId)}/files?path=${encodeURIComponent(path)}`),
+  saveWorkspaceFile: (workspaceId: string, input: WorkspaceFileSaveInput) =>
+    request<WorkspaceFileWriteResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/files`, { method: 'PUT', body: JSON.stringify(input) }),
+  workspaceFileDiff: (workspaceId: string, path: string) =>
+    request<{ diff: string }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/files/diff?path=${encodeURIComponent(path)}`),
+  revertWorkspaceFile: (workspaceId: string, input: WorkspaceFileRevertInput) =>
+    request<WorkspaceFileWriteResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/files/revert`, { method: 'POST', body: JSON.stringify(input) }),
   selectDirectory: () => request<PathSelection>('/api/system/select-directory', { method: 'POST' }),
   openPath: (path: string) => request<{ ok: boolean }>('/api/system/open-path', { method: 'POST', body: JSON.stringify({ path }) }),
   items: async (params: URLSearchParams) => ((await request<ItemSummary[] | null>(`/api/items?${params.toString()}`)) ?? []).map(normalizeItem),
@@ -124,6 +143,25 @@ function normalizeWorkspace(workspace: WorkspaceConfig): WorkspaceConfig {
   return {
     ...workspace,
     sources: Array.isArray(workspace.sources) ? workspace.sources : []
+  };
+}
+
+function normalizeWorkspaceDirectoryListing(listing: WorkspaceDirectoryListing): WorkspaceDirectoryListing {
+  return {
+    ...listing,
+    path: listing.path ?? '',
+    hiddenCount: listing.hiddenCount ?? 0,
+    entries: (Array.isArray(listing.entries) ? listing.entries : []).map(normalizeWorkspaceTreeEntry)
+  };
+}
+
+function normalizeWorkspaceTreeEntry(entry: WorkspaceTreeEntry): WorkspaceTreeEntry {
+  return {
+    ...entry,
+    hasChildren: Boolean(entry.hasChildren),
+    ignored: Boolean(entry.ignored),
+    hidden: Boolean(entry.hidden),
+    editable: Boolean(entry.editable)
   };
 }
 

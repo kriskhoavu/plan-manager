@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, ChevronDown, GitBranch, KanbanSquare, ListChecks, Moon, Plus, Search, Sun, Boxes, FolderGit2 } from 'lucide-react';
+import { Bell, ChevronDown, GitBranch, KanbanSquare, ListChecks, Moon, Plus, Search, Sun, Boxes, FolderGit2, FolderTree } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
@@ -9,6 +9,7 @@ import { KanbanPage } from './pages/KanbanPage';
 import { ItemsPage } from './pages/ItemsPage';
 import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
+import { WorkspaceExplorerPage } from './pages/WorkspaceExplorerPage';
 import { ActivityPanel } from './components/ReliabilityPanels';
 import { SearchDialog } from './components/SearchDialog';
 import { useQuickSwitcher } from './features/search/hooks';
@@ -68,6 +69,7 @@ export function App() {
         <div className="nav-section">
           <span className="nav-section-label">Workspace</span>
           <NavButton active={route.name === 'kanban'} onClick={() => navigate({ name: 'kanban' })} icon={<KanbanSquare size={18} />} label="Kanban" />
+          <NavButton active={route.name === 'explorer'} onClick={() => navigate({ name: 'explorer' })} icon={<FolderTree size={18} />} label="Explorer" />
           <NavButton active={route.name === 'items'} onClick={() => navigate({ name: 'items' })} icon={<ListChecks size={18} />} label={labels.items} />
           <NavButton active={route.name === 'branches'} onClick={() => navigate({ name: 'branches' })} icon={<GitBranch size={18} />} label="Branches" />
           <NavButton active={route.name === 'workspaces'} onClick={() => navigate({ name: 'workspaces' })} icon={<FolderGit2 size={18} />} label={labels.workspaces} />
@@ -173,6 +175,7 @@ export function App() {
         {route.name === 'branches' && <BranchesPage workspace={activeRepo} refreshKey={contentRefreshKey} onOpenBranch={(branch) => navigate({ name: 'kanban' })} />}
         {route.name === 'workspace' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} onContentChanged={() => refreshAppStateOnly(true)} />}
         {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData(true)} />}
+        {route.name === 'explorer' && <WorkspaceExplorerPage workspaces={workspaces} location={route.location} onOpenKanban={selectWorkspace} />}
       </main>
 
       {showStaleNotice && (
@@ -192,6 +195,7 @@ export function App() {
 
       <nav className="bottom-nav">
         <button className={route.name === 'kanban' ? 'active' : ''} onClick={() => navigate({ name: 'kanban' })}><KanbanSquare size={18} />Kanban</button>
+        <button className={route.name === 'explorer' ? 'active' : ''} onClick={() => navigate({ name: 'explorer' })}><FolderTree size={18} />Explorer</button>
         <button className={route.name === 'items' ? 'active' : ''} onClick={() => navigate({ name: 'items' })}><ListChecks size={18} />Items</button>
         <button className={route.name === 'branches' ? 'active' : ''} onClick={() => navigate({ name: 'branches' })}><GitBranch size={18} />Branches</button>
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>

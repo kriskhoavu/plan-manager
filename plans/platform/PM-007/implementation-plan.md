@@ -27,7 +27,7 @@ All code and UI text must use these names:
 | B2    | Workspace File Application Service   | ✅     |
 | B3    | Workspace File APIs                  | ✅     |
 | B4    | Backend Safety And Scale Tests       | ✅     |
-| F1    | Types, API, And Explorer Route       |        |
+| F1    | Types, API, And Explorer Route       | ✅     |
 | F2    | Tree State And Shared Editor Session |        |
 | F3    | Filesystem Explorer And Editor UI    |        |
 | F4    | Styling, Performance, And QA         |        |
@@ -136,12 +136,12 @@ PM-007: Add workspace explorer backend regression tests
 
 **Deliverables:**
 
-- [ ] Add workspace listing, entry, save, diff, and revert types.
-- [ ] Add API client methods with response normalization.
-- [ ] Add `/explorer` and workspace/path query helpers.
-- [ ] Add Explorer to desktop and mobile navigation beside Kanban.
-- [ ] Add explicit Open Kanban behavior for workspace roots.
-- [ ] Add API and route regression tests.
+- [x] Add workspace listing, entry, save, diff, and revert types.
+- [x] Add API client methods with response normalization.
+- [x] Add `/explorer` and workspace/path query helpers.
+- [x] Add Explorer to desktop and mobile navigation beside Kanban.
+- [x] Add explicit Open Kanban behavior for workspace roots.
+- [x] Add API and route regression tests.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 
