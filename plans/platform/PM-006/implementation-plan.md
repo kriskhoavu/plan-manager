@@ -21,7 +21,7 @@ All code and UI text must use these names:
 |-------|--------------------------------------|--------|
 | B1    | File Classification And Limits       | ✅     |
 | B2    | Viewer API Metadata                  | ✅     |
-| B3    | Guarded Read Integration             |        |
+| B3    | Guarded Read Integration             | ✅     |
 | B4    | Backend Regression Tests             |        |
 | F1    | Viewer Types And Rendering Pipeline  |        |
 | F2    | Structured And Source Views          |        |
@@ -79,11 +79,11 @@ PM-006: Add viewer metadata to file responses
 
 **Deliverables:**
 
-- [ ] Apply classification and bounded reads in `fileaccess.Read`.
-- [ ] Reject binary content without returning binary bytes.
-- [ ] Preserve full Markdown content and hash behavior within limits.
-- [ ] Keep `WriteMarkdown` rules and stale-write checks unchanged.
-- [ ] Map unsupported content to a clear API error.
+- [x] Apply classification and bounded reads in `fileaccess.Read`.
+- [x] Reject binary content without returning binary bytes.
+- [x] Preserve full Markdown content and hash behavior within limits.
+- [x] Keep `WriteMarkdown` rules and stale-write checks unchanged.
+- [x] Map unsupported content to a clear API error.
 
 **Verification:** `rtk go test ./...`
 

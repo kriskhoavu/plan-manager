@@ -3,19 +3,24 @@ package fileaccess
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"plan-manager/internal/models"
 	"plan-manager/internal/security/pathguard"
 )
 
 type Access struct{}
+
+var ErrUnsupportedContent = errors.New("unsupported file content")
 
 func New() *Access {
 	return &Access{}
@@ -38,11 +43,7 @@ func (a *Access) Read(workspace models.WorkspaceConfig, item models.ItemDetail, 
 	if err != nil {
 		return models.FileContent{}, err
 	}
-	data, err := os.ReadFile(full)
-	if err != nil {
-		return models.FileContent{}, err
-	}
-	return fileContent(relPath, data), nil
+	return readFileContent(relPath, full)
 }
 
 func (a *Access) WriteMarkdown(workspace models.WorkspaceConfig, item models.ItemDetail, input models.FileSaveInput) (models.FileContent, error) {
@@ -238,13 +239,64 @@ func fileIDForPath(path string) string {
 }
 
 func fileContent(relPath string, data []byte) models.FileContent {
+	classification := classifyPath(relPath)
 	return models.FileContent{
-		ID:       fileIDForPath(relPath),
-		Path:     relPath,
-		Content:  string(data),
-		Language: language(relPath),
-		Hash:     contentHash(data),
+		ID:        fileIDForPath(relPath),
+		Path:      relPath,
+		Content:   string(data),
+		Language:  classification.language,
+		Hash:      contentHash(data),
+		Kind:      classification.kind,
+		SizeBytes: int64(len(data)),
+		Editable:  classification.kind == FileKindMarkdown,
 	}
+}
+
+func readFileContent(relPath, fullPath string) (models.FileContent, error) {
+	file, err := os.Open(fullPath)
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	data, err := io.ReadAll(io.LimitReader(file, MaxTextResponseBytes+1))
+	if err != nil {
+		return models.FileContent{}, err
+	}
+	if isBinary(data) {
+		return models.FileContent{}, ErrUnsupportedContent
+	}
+
+	truncated := info.Size() > MaxTextResponseBytes || int64(len(data)) > MaxTextResponseBytes
+	if truncated {
+		data = data[:MaxTextResponseBytes]
+		for len(data) > 0 && !utf8.Valid(data) {
+			data = data[:len(data)-1]
+		}
+	}
+
+	hash := contentHash(data)
+	if truncated {
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			return models.FileContent{}, err
+		}
+		hasher := sha256.New()
+		if _, err := io.Copy(hasher, file); err != nil {
+			return models.FileContent{}, err
+		}
+		hash = hex.EncodeToString(hasher.Sum(nil))
+	}
+
+	content := fileContent(relPath, data)
+	content.Hash = hash
+	content.SizeBytes = info.Size()
+	content.Truncated = truncated
+	content.Editable = content.Kind == FileKindMarkdown && !truncated
+	return content, nil
 }
 
 func contentHash(data []byte) string {
