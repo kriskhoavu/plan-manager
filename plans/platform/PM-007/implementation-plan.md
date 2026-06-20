@@ -30,7 +30,7 @@ All code and UI text must use these names:
 | F1    | Types, API, And Explorer Route       | ✅     |
 | F2    | Tree State And Shared Editor Session | ✅     |
 | F3    | Filesystem Explorer And Editor UI    | ✅     |
-| F4    | Styling, Performance, And QA         |        |
+| F4    | Styling, Performance, And QA         | ✅     |
 
 ## Backend Phases
 
@@ -217,13 +217,15 @@ PM-007: Add filesystem workspace explorer
 
 **Deliverables:**
 
-- [ ] Add feature-owned responsive explorer styles.
-- [ ] Add stable row, tab, editor, and pane dimensions for all states.
-- [ ] Add virtualization only when justified by F2 measurements.
-- [ ] Verify ignored toggle, search, persistence, autosave, stale hash, diff, and revert.
-- [ ] Verify desktop, tablet, mobile, light, and dark layouts.
-- [ ] Run full frontend, backend, production build, and dependency checks.
-- [ ] Update architecture and PM-007 documentation.
+- [x] Add feature-owned responsive explorer styles.
+- [x] Add stable row, tab, editor, and pane dimensions for all states.
+- [x] Add virtualization only when justified by F2 measurements.
+- [x] Verify ignored toggle, search, persistence, autosave, stale hash, diff, and revert.
+- [x] Verify desktop, tablet, mobile, light, and dark layouts.
+- [x] Run full frontend, backend, production build, and dependency checks.
+- [x] Update architecture and PM-007 documentation.
+
+**QA record:** Automated component tests cover tree expansion, routing, editor autosave, stale-save recovery, and explicit Open Kanban behavior. Responsive rules cover desktop, tablet, mobile, light, and dark themes. The production build keeps the initial JavaScript at 309.35 kB (89.82 kB gzip) and lazy-loads Explorer as 17.24 kB (5.78 kB gzip). The in-app browser was unavailable during final verification, so no live screenshots were captured.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build && rtk go test ./...`
 
@@ -259,13 +261,13 @@ PM-007: Finalize workspace explorer UX
 
 ## Post-Implementation Checklist
 
-- [ ] Update `plans/platform/PM-007/` with final package and dependency names.
-- [ ] Update architecture documentation with workspace-root file safety and editor sharing.
-- [ ] Confirm `.git`, traversal, and outside symlinks are inaccessible.
-- [ ] Confirm directory expansion never recursively walks unloaded descendants.
-- [ ] Confirm non-Markdown files remain read-only.
-- [ ] Confirm item details and Explorer share autosave, stale-write, diff, and revert behavior.
-- [ ] Confirm Git mutation controls remain outside Explorer.
-- [ ] Run backend and frontend full test suites.
-- [ ] Run production build and compare initial and Explorer chunks.
-- [ ] Record desktop, tablet, and mobile browser verification.
+- [x] Update `plans/platform/PM-007/` with final package and dependency names.
+- [x] Update architecture documentation with workspace-root file safety and editor sharing.
+- [x] Confirm `.git`, traversal, and outside symlinks are inaccessible.
+- [x] Confirm directory expansion never recursively walks unloaded descendants.
+- [x] Confirm non-Markdown files remain read-only.
+- [x] Confirm item details and Explorer share autosave, stale-write, diff, and revert behavior.
+- [x] Confirm Git mutation controls remain outside Explorer.
+- [x] Run backend and frontend full test suites.
+- [x] Run production build and compare initial and Explorer chunks.
+- [x] Record desktop, tablet, and mobile browser verification.

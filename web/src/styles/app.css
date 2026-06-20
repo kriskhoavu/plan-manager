@@ -1,4 +1,5 @@
 @import "./app-shell.css";
+@import "../features/workspace-explorer/workspace-explorer.css";
 
 :root {
   color-scheme: light;
@@ -3574,7 +3575,7 @@ body.is-resizing-panel {
     bottom: 0;
     grid-row: 3;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     background: var(--nav);
     border-top: 1px solid #1d2b3c;
   }

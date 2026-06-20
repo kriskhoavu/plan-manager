@@ -123,14 +123,16 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
   const startResize = (side: 'left' | 'right', event: React.PointerEvent<HTMLButtonElement>) => {
     const start = event.clientX;
     const initial = side === 'left' ? leftWidth : rightWidth;
+    let latest = initial;
     const move = (next: PointerEvent) => {
       const width = Math.min(520, Math.max(220, initial + (side === 'left' ? next.clientX - start : start - next.clientX)));
+      latest = width;
       gridRef.current?.style.setProperty(side === 'left' ? '--explorer-left-width' : '--explorer-right-width', `${width}px`);
       if (side === 'left') setLeftWidth(width); else setRightWidth(width);
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
-      localStorage.setItem(side === 'left' ? 'workspaceExplorer.leftWidth' : 'workspaceExplorer.rightWidth', String(side === 'left' ? leftWidth : rightWidth));
+      localStorage.setItem(side === 'left' ? 'workspaceExplorer.leftWidth' : 'workspaceExplorer.rightWidth', String(latest));
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up, { once: true });

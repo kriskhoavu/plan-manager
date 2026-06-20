@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Bell, ChevronDown, GitBranch, KanbanSquare, ListChecks, Moon, Plus, Search, Sun, Boxes, FolderGit2, FolderTree } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
@@ -9,11 +9,12 @@ import { KanbanPage } from './pages/KanbanPage';
 import { ItemsPage } from './pages/ItemsPage';
 import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
-import { WorkspaceExplorerPage } from './pages/WorkspaceExplorerPage';
 import { ActivityPanel } from './components/ReliabilityPanels';
 import { SearchDialog } from './components/SearchDialog';
 import { useQuickSwitcher } from './features/search/hooks';
 import { labels } from './lib/vocabulary';
+
+const WorkspaceExplorerPage = lazy(() => import('./pages/WorkspaceExplorerPage').then((module) => ({ default: module.WorkspaceExplorerPage })));
 
 export function App() {
   const {
@@ -175,7 +176,7 @@ export function App() {
         {route.name === 'branches' && <BranchesPage workspace={activeRepo} refreshKey={contentRefreshKey} onOpenBranch={(branch) => navigate({ name: 'kanban' })} />}
         {route.name === 'workspace' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} onContentChanged={() => refreshAppStateOnly(true)} />}
         {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData(true)} />}
-        {route.name === 'explorer' && <WorkspaceExplorerPage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenKanban={selectWorkspace} />}
+        {route.name === 'explorer' && <Suspense fallback={<section className="empty-state">Loading Explorer...</section>}><WorkspaceExplorerPage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenKanban={selectWorkspace} /></Suspense>}
       </main>
 
       {showStaleNotice && (

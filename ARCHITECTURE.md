@@ -1,6 +1,6 @@
 # Plan Manager Architecture
 
-This document describes the current architecture after PM-003 through PM-006.
+This document describes the current architecture after PM-003 through PM-007.
 
 Plan Manager is a local web app. A Go server exposes a JSON API and serves embedded React assets. The backend scans registered Git workspaces, caches item metadata in YAML files, serves item data, writes selected Markdown and metadata files, and runs guarded Git operations.
 
@@ -8,7 +8,7 @@ Plan Manager is a local web app. A Go server exposes a JSON API and serves embed
 
 - Run locally on the developer machine.
 - Keep planning files in Git.
-- Show one active workspace at a time.
+- Keep Kanban scoped to one active workspace while Explorer spans every registered workspace.
 - Support multiple sources per workspace.
 - Support structured items, configured document sources, and freestyle docs.
 - Allow explicit, guarded writes to managed workspaces.
@@ -36,6 +36,7 @@ User browser
 │ - Kanban board                                               │
 │ - Workspace management                                       │
 │ - Item workspace                                             │
+│ - Global workspace explorer                                  │
 └──────────────────────────────┬───────────────────────────────┘
                                │ HTTP JSON
 ┌──────────────────────────────▼───────────────────────────────┐
@@ -66,54 +67,59 @@ User browser
 
 ## Backend Components
 
-| Component            | Package                          | Responsibility                                                        |
-|----------------------|----------------------------------|-----------------------------------------------------------------------|
-| CLI entrypoint       | `cmd/plan-manager`               | Parses `serve` command and port flag                                  |
-| Server               | `internal/app`                   | Resolves app paths, wires dependencies, serves API and frontend       |
-| HTTP API             | `internal/api`                   | Defines routes, decodes requests, encodes responses                   |
-| Application services | `internal/application/*`         | Coordinates workspace, item, and Git use cases                        |
-| App errors           | `internal/application/apperrors` | Shared not-found sentinels across services and HTTP                   |
-| Config               | `internal/config`                | Resolves OS user config path                                          |
-| Registry             | `internal/registry`              | Stores registered workspaces in `workspaces.yaml`                     |
-| Item index           | `internal/itemindex`             | Stores cached item scan results in `item-index.yaml`                  |
-| Audit store          | `internal/audit`                 | Appends and reads local operation events in JSONL                     |
-| Navigation store     | `internal/navigation`            | Stores saved filters and recent items in YAML                         |
-| Health service       | `internal/application/health`    | Runs read-only workspace, source, Git, and index checks               |
-| Safety service       | `internal/application/safety`    | Centralizes write path and Git preflight decisions                    |
-| Search service       | `internal/application/search`    | Ranks indexed item matches without scanning workspaces                |
-| Scanner              | `internal/scanner`               | Reads sources and builds item metadata                                |
-| Scanner metadata     | `internal/scanner/metadata_*`    | Parses `item.yaml`, legacy `plan.yaml`, and document metadata         |
-| Scanner settings     | `internal/scanner/source_*`      | Matches source structure settings to item folders                     |
-| File access          | `internal/fileaccess`            | Builds file trees, classifies bounded text reads, and writes Markdown |
-| Item writer          | `internal/itemwriter`            | Writes Markdown, metadata, status changes, and new items              |
-| Path guard           | `internal/security/pathguard`    | Shared safe-join and configured-source path validation                |
-| Git adapter          | `internal/gitadapter`            | Runs Git status and guarded Git commands with timeout                 |
-| System dialog        | `internal/systemdialog`          | Opens native folder picker and reveals local paths                    |
-| Models               | `internal/models`                | Defines stable API DTOs and shared data structures                    |
+| Component              | Package                               | Responsibility                                                        |
+|------------------------|---------------------------------------|-----------------------------------------------------------------------|
+| CLI entrypoint         | `cmd/plan-manager`                    | Parses `serve` command and port flag                                  |
+| Server                 | `internal/app`                        | Resolves app paths, wires dependencies, serves API and frontend       |
+| HTTP API               | `internal/api`                        | Defines routes, decodes requests, encodes responses                   |
+| Application services   | `internal/application/*`              | Coordinates workspace, item, and Git use cases                        |
+| App errors             | `internal/application/apperrors`      | Shared not-found sentinels across services and HTTP                   |
+| Config                 | `internal/config`                     | Resolves OS user config path                                          |
+| Registry               | `internal/registry`                   | Stores registered workspaces in `workspaces.yaml`                     |
+| Item index             | `internal/itemindex`                  | Stores cached item scan results in `item-index.yaml`                  |
+| Audit store            | `internal/audit`                      | Appends and reads local operation events in JSONL                     |
+| Navigation store       | `internal/navigation`                 | Stores saved filters and recent items in YAML                         |
+| Health service         | `internal/application/health`         | Runs read-only workspace, source, Git, and index checks               |
+| Safety service         | `internal/application/safety`         | Centralizes write path and Git preflight decisions                    |
+| Search service         | `internal/application/search`         | Ranks indexed item matches without scanning workspaces                |
+| Scanner                | `internal/scanner`                    | Reads sources and builds item metadata                                |
+| Scanner metadata       | `internal/scanner/metadata_*`         | Parses `item.yaml`, legacy `plan.yaml`, and document metadata         |
+| Scanner settings       | `internal/scanner/source_*`           | Matches source structure settings to item folders                     |
+| File access            | `internal/fileaccess`                 | Builds file trees, classifies bounded text reads, and writes Markdown |
+| Workspace file access  | `internal/workspacefiles`             | Lists lazy root-relative directories and guards workspace file paths  |
+| Workspace file service | `internal/application/workspacefiles` | Coordinates reads, saves, diffs, reverts, audit, and targeted refresh |
+| Item writer            | `internal/itemwriter`                 | Writes Markdown, metadata, status changes, and new items              |
+| Path guard             | `internal/security/pathguard`         | Shared safe-join and configured-source path validation                |
+| Git adapter            | `internal/gitadapter`                 | Runs Git status and guarded Git commands with timeout                 |
+| System dialog          | `internal/systemdialog`               | Opens native folder picker and reveals local paths                    |
+| Models                 | `internal/models`                     | Defines stable API DTOs and shared data structures                    |
 
 ## Frontend Components
 
-| Component                 | Path                                   | Responsibility                                                    |
-|---------------------------|----------------------------------------|-------------------------------------------------------------------|
-| App shell                 | `web/src/App.tsx`                      | Layout and navigation composition                                 |
-| App state                 | `web/src/app/useAppState.ts`           | Workspace, theme, refresh, route, and stale-content state         |
-| Router helpers            | `web/src/app/router.ts`                | Browser path parsing and path generation                          |
-| API facade                | `web/src/lib/api.ts`                   | Compatibility export for existing feature imports                 |
-| Shared API implementation | `web/src/shared/api`                   | Fetch wrapper, endpoint methods, and response normalization       |
-| Shared domain helpers     | `web/src/shared/domain`                | Reusable diff parsing and domain helpers                          |
-| Feature helpers           | `web/src/features/*`                   | Kanban filtering and workspace source settings helper logic       |
-| Shared types              | `web/src/lib/types.ts`                 | Frontend API types                                                |
-| Reliability hooks         | `web/src/features/reliability`         | Workspace health and activity loading and refresh                 |
-| Search hooks              | `web/src/features/search`              | Debounced search, quick switcher, and keyboard navigation         |
-| Content viewer            | `web/src/features/content-viewer`      | Secure Markdown, HTML, JSON, YAML, code, and text rendering       |
-| Search dialog             | `web/src/components/SearchDialog.tsx`  | Global search, grouped results, and recent items                  |
-| Kanban page               | `web/src/pages/KanbanPage.tsx`         | Board, cards, and preview drawer composition                      |
-| Workspace page            | `web/src/pages/WorkspacesPage.tsx`     | Workspace create, edit, delete, scan, reveal                      |
-| Item workspace page       | `web/src/pages/ItemWorkspacePage.tsx`  | File tree, preview, Markdown editor, diff, metadata, Git controls |
-| Items page                | `web/src/pages/ItemsPage.tsx`          | Searchable list view for active workspace                         |
-| Branches page             | `web/src/pages/BranchesPage.tsx`       | Branch summary inferred from indexed items                        |
-| Error boundary            | `web/src/components/ErrorBoundary.tsx` | Catches frontend render failures                                  |
-| Styles                    | `web/src/styles`                       | Global styles plus app-shell stylesheet                           |
+| Component                 | Path                                      | Responsibility                                                    |
+|---------------------------|-------------------------------------------|-------------------------------------------------------------------|
+| App shell                 | `web/src/App.tsx`                         | Layout and navigation composition                                 |
+| App state                 | `web/src/app/useAppState.ts`              | Workspace, theme, refresh, route, and stale-content state         |
+| Router helpers            | `web/src/app/router.ts`                   | Browser path parsing and path generation                          |
+| API facade                | `web/src/lib/api.ts`                      | Compatibility export for existing feature imports                 |
+| Shared API implementation | `web/src/shared/api`                      | Fetch wrapper, endpoint methods, and response normalization       |
+| Shared domain helpers     | `web/src/shared/domain`                   | Reusable diff parsing and domain helpers                          |
+| Feature helpers           | `web/src/features/*`                      | Kanban filtering and workspace source settings helper logic       |
+| Shared types              | `web/src/lib/types.ts`                    | Frontend API types                                                |
+| Reliability hooks         | `web/src/features/reliability`            | Workspace health and activity loading and refresh                 |
+| Search hooks              | `web/src/features/search`                 | Debounced search, quick switcher, and keyboard navigation         |
+| Content viewer            | `web/src/features/content-viewer`         | Secure Markdown, HTML, JSON, YAML, code, and text rendering       |
+| File editor session       | `web/src/features/file-editor`            | Shared Markdown autosave, stale-write, and settled-save state     |
+| Workspace explorer        | `web/src/features/workspace-explorer`     | Lazy tree cache, flattening, decorations, selection, and keyboard |
+| Search dialog             | `web/src/components/SearchDialog.tsx`     | Global search, grouped results, and recent items                  |
+| Kanban page               | `web/src/pages/KanbanPage.tsx`            | Board, cards, and preview drawer composition                      |
+| Workspace page            | `web/src/pages/WorkspacesPage.tsx`        | Workspace create, edit, delete, scan, reveal                      |
+| Item workspace page       | `web/src/pages/ItemWorkspacePage.tsx`     | File tree, preview, Markdown editor, diff, metadata, Git controls |
+| Explorer page             | `web/src/pages/WorkspaceExplorerPage.tsx` | Global filesystem tree, file editor, and context inspector        |
+| Items page                | `web/src/pages/ItemsPage.tsx`             | Searchable list view for active workspace                         |
+| Branches page             | `web/src/pages/BranchesPage.tsx`          | Branch summary inferred from indexed items                        |
+| Error boundary            | `web/src/components/ErrorBoundary.tsx`    | Catches frontend render failures                                  |
+| Styles                    | `web/src/styles`                          | Global styles plus app-shell stylesheet                           |
 
 ## Dependency Rules
 
@@ -215,6 +221,20 @@ User edits Markdown or metadata
   -> scanner rescans the affected workspace
   -> item index and /api/state version update
   -> frontend refreshes current data and other tabs show stale-content notice
+```
+
+### Workspace Explorer
+
+```text
+User opens /explorer
+  -> frontend renders every registered workspace as a root
+  -> expanding one row requests GET /api/workspaces/{id}/tree
+  -> workspacefiles rejects traversal, .git, and outside symlinks
+  -> Git ignore checks run once for the immediate directory
+  -> selecting a file requests bounded classified content and its diff
+  -> Markdown uses the shared editor session and required content hash
+  -> successful saves and reverts append audit events
+  -> configured-source changes trigger a targeted workspace refresh
 ```
 
 ### Git Operations

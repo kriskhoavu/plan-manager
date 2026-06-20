@@ -76,10 +76,25 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
   }, []);
 
   useEffect(() => {
-    for (const workspace of workspaces) {
-      if (expandedNodeIds.has(explorerNodeId(workspace.id, ''))) void loadDirectory(workspace.id, '');
+    for (const id of expandedNodeIds) {
+      const separator = id.indexOf(':');
+      if (separator > 0) void loadDirectory(id.slice(0, separator), id.slice(separator + 1));
     }
-  }, [expandedNodeIds, loadDirectory, workspaces]);
+  }, [expandedNodeIds, loadDirectory, showIgnored, workspaces]);
+
+  useEffect(() => {
+    if (!location?.workspaceId) return;
+    const segments = (location.path ?? '').split('/').filter(Boolean);
+    const directoryPaths = ['', ...segments.slice(0, -1).map((_, index) => segments.slice(0, index + 1).join('/'))];
+    setExpandedNodeIds((current) => {
+      const next = new Set(current);
+      directoryPaths.forEach((path) => next.add(explorerNodeId(location.workspaceId!, path)));
+      if (next.size === current.size) return current;
+      localStorage.setItem(expandedStorageKey, JSON.stringify([...next]));
+      return next;
+    });
+    directoryPaths.forEach((path) => void loadDirectory(location.workspaceId!, path));
+  }, [loadDirectory, location?.path, location?.workspaceId]);
 
   const select = useCallback((workspaceId: string, path: string) => onLocationChange?.({ workspaceId, path: path || undefined }), [onLocationChange]);
   const rows = useMemo(() => flattenVisibleTree({ workspaces, expandedNodeIds, cache, includeIgnored: showIgnored, decorations, filter }), [cache, decorations, expandedNodeIds, filter, showIgnored, workspaces]);

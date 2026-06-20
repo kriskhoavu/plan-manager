@@ -175,7 +175,7 @@ Folders stay visually quiet. Known item folders receive a small status rail and 
 - Load file content, diff, Git status, and health only when needed.
 - Cache successful directory listings and selected files.
 - Flatten only expanded nodes with memoized helpers.
-- Virtualize visible rows if large-tree measurements justify the dependency.
+- Keep the memoized visible row list dependency-free. Revisit virtualization above 1,000 visible rows or a 16 ms frame budget.
 - Cancel or ignore stale requests after rapid selection changes.
 
 ## Design Decisions
