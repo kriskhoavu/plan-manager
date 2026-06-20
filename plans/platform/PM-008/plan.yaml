@@ -1,19 +1,17 @@
 schemaVersion: 1
 
 plan:
-  ticket: PM-007
-  title: Workspace Explorer
+  ticket: PM-008
+  title: Explorer Productivity Enhancements
   service: platform
-  status: implemented
+  status: draft
   owner: null
   tags:
     - plan-manager
     - explorer
-    - workspace
     - filesystem
-    - editing
-    - navigation
-    - tree-view
+    - search
+    - git
     - productivity
   targetDate: null
 
@@ -26,7 +24,7 @@ documents:
     role: overview
     path: README.md
     label: Overview
-  - id: scenario-overview
+  - id: scenarios
     role: scenario
     path: scenario/scenario-00-overview.md
     label: Scenario Overview

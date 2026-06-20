@@ -1,0 +1,203 @@
+# Implementation Plan: PM-008 - Explorer Productivity Enhancements
+
+## Overview
+
+Add bounded path search, Git tree decorations, guarded Markdown and directory creation, and safe rename operations to the PM-007 Workspace Explorer.
+
+## Phases Summary
+
+| Phase | Name                             | Status |
+|-------|----------------------------------|--------|
+| B1    | Guarded Create And Rename Domain |        |
+| B2    | Path Search And Git State Domain |        |
+| B3    | Application Service And APIs     |        |
+| B4    | Backend Safety And Scale Tests   |        |
+| F1    | Types And API Clients            |        |
+| F2    | Search, Git, And Mutation State  |        |
+| F3    | Explorer Productivity UI         |        |
+| F4    | Responsive Styling And Final QA  |        |
+
+## Backend Phases
+
+### Phase B1: Guarded Create And Rename Domain
+
+**Deliverables:**
+
+- [ ] Add create, rename, and mutation result models.
+- [ ] Add single-segment name validation.
+- [ ] Add exclusive Markdown creation and one-directory creation.
+- [ ] Add guarded same-workspace rename without overwrite.
+- [ ] Return precise parent cache invalidation paths.
+- [ ] Cover traversal, `.git`, symlink, format, collision, and root safeguards.
+
+**Verification:** `rtk go test ./internal/workspacefiles ./internal/security/pathguard`
+
+**Draft Commit:**
+```text
+PM-008: Add guarded workspace path mutations
+
+- Create Markdown files and directories safely
+- Rename workspace paths without overwrite
+- Cover protected and collision cases
+```
+
+### Phase B2: Path Search And Git State Domain
+
+**Deliverables:**
+
+- [ ] Add bounded search models and traversal.
+- [ ] Batch ignored-path checks by directory.
+- [ ] Skip `.git` and outside symlinks.
+- [ ] Add deterministic result ordering and truncation.
+- [ ] Normalize Git changes into path state responses.
+- [ ] Cover unloaded, ignored, deep, large, and renamed paths.
+
+**Verification:** `rtk go test ./internal/workspacefiles ./internal/gitadapter`
+
+**Draft Commit:**
+```text
+PM-008: Add workspace path search and Git state
+
+- Search bounded unloaded workspace paths
+- Respect ignored and protected entries
+- Normalize Git state for Explorer rows
+```
+
+### Phase B3: Application Service And APIs
+
+**Deliverables:**
+
+- [ ] Add search, create, rename, and Git state service methods.
+- [ ] Add audit events for successful and blocked mutations.
+- [ ] Refresh configured sources only when affected.
+- [ ] Add all proposed HTTP routes and error mapping.
+- [ ] Preserve PM-007 route contracts.
+- [ ] Add application and API regression tests.
+
+**Verification:** `rtk go test ./internal/application/workspacefiles ./internal/api ./internal/app`
+
+**Draft Commit:**
+```text
+PM-008: Add Explorer productivity APIs
+
+- Expose path search and Git decorations
+- Add guarded create and rename routes
+- Audit mutations and refresh affected sources
+```
+
+### Phase B4: Backend Safety And Scale Tests
+
+**Deliverables:**
+
+- [ ] Cover search result and visited-entry limits.
+- [ ] Cover ignored and outside-symlink traversal.
+- [ ] Cover exclusive create and no-overwrite rename behavior.
+- [ ] Cover audit and targeted refresh results.
+- [ ] Run the complete backend suite.
+
+**Verification:** `rtk go test ./...`
+
+**Draft Commit:**
+```text
+PM-008: Add Explorer productivity regression tests
+
+- Exercise search limits and ignore rules
+- Protect create and rename safeguards
+- Run complete backend regression coverage
+```
+
+## Frontend Phases
+
+### Phase F1: Types And API Clients
+
+**Deliverables:**
+
+- [ ] Add search, Git state, create, rename, and mutation result types.
+- [ ] Add normalized API client methods.
+- [ ] Add API contract tests.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run`
+
+**Draft Commit:**
+```text
+PM-008: Add Explorer productivity contracts
+
+- Add path search and Git state clients
+- Add create and rename clients
+- Normalize optional response collections
+```
+
+### Phase F2: Search, Git, And Mutation State
+
+**Deliverables:**
+
+- [ ] Add debounced cancellable search state.
+- [ ] Add Git path state normalization and loading.
+- [ ] Add create and rename mutation state.
+- [ ] Add targeted directory cache invalidation.
+- [ ] Add expand-to-result behavior.
+- [ ] Add helper and hook tests.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run`
+
+**Draft Commit:**
+```text
+PM-008: Add Explorer productivity state
+
+- Search unloaded workspace paths
+- Cache Git decorations by path
+- Refresh targeted directories after mutations
+```
+
+### Phase F3: Explorer Productivity UI
+
+**Deliverables:**
+
+- [ ] Add search results with keyboard navigation.
+- [ ] Add accessible Git state markers to tree rows.
+- [ ] Add create file and directory dialogs.
+- [ ] Add confirmed rename dialog.
+- [ ] Save pending Markdown before rename.
+- [ ] Add component and integration tests.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run`
+
+**Draft Commit:**
+```text
+PM-008: Add Explorer productivity controls
+
+- Add repository-wide path search UI
+- Show Git state on workspace rows
+- Create and rename guarded workspace paths
+```
+
+### Phase F4: Responsive Styling And Final QA
+
+**Deliverables:**
+
+- [ ] Add feature-owned responsive search, marker, menu, and dialog styles.
+- [ ] Verify keyboard, mobile, light, and dark states.
+- [ ] Run backend, frontend, dependency, and production-build checks.
+- [ ] Update architecture and PM-008 documents.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build && rtk go test ./...`
+
+**Draft Commit:**
+```text
+PM-008: Finalize Explorer productivity UX
+
+- Add responsive productivity styling
+- Complete accessibility and regression checks
+- Update architecture and planning documents
+```
+
+## Post-Implementation Checklist
+
+- [ ] Confirm no operation can expose or modify `.git`.
+- [ ] Confirm search and rename cannot follow outside symlinks.
+- [ ] Confirm create and rename never overwrite a destination.
+- [ ] Confirm ignored mode controls search and tree behavior consistently.
+- [ ] Confirm Git status uses one call per workspace refresh.
+- [ ] Confirm item editor and PM-007 Explorer regressions pass.
+- [ ] Run full backend and frontend suites.
+- [ ] Run the production build and record bundle output.
