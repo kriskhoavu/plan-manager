@@ -13,7 +13,7 @@ Add bounded path search, Git tree decorations, guarded Markdown and directory cr
 | B3    | Application Service And APIs     | ✅     |
 | B4    | Backend Safety And Scale Tests   | ✅     |
 | F1    | Types And API Clients            | ✅     |
-| F2    | Search, Git, And Mutation State  |        |
+| F2    | Search, Git, And Mutation State  | ✅     |
 | F3    | Explorer Productivity UI         |        |
 | F4    | Responsive Styling And Final QA  |        |
 
@@ -131,12 +131,12 @@ PM-008: Add Explorer productivity contracts
 
 **Deliverables:**
 
-- [ ] Add debounced cancellable search state.
-- [ ] Add Git path state normalization and loading.
-- [ ] Add create and rename mutation state.
-- [ ] Add targeted directory cache invalidation.
-- [ ] Add expand-to-result behavior.
-- [ ] Add helper and hook tests.
+- [x] Add debounced cancellable search state.
+- [x] Add Git path state normalization and loading.
+- [x] Add create and rename mutation state.
+- [x] Add targeted directory cache invalidation.
+- [x] Add expand-to-result behavior.
+- [x] Add helper and hook tests.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

@@ -4,6 +4,8 @@ import { api } from '../../lib/api';
 import type { WorkspaceConfig } from '../../lib/types';
 import { buildItemDecorations, directoryCacheKey, explorerNodeId, flattenVisibleTree } from './tree';
 import type { DirectoryCacheEntry, ExplorerSelection } from './types';
+import { ancestorDirectoryPaths, buildWorkspaceGitStateMap } from './productivity';
+import type { WorkspacePathGitState } from '../../lib/types';
 
 const expandedStorageKey = 'workspaceExplorer.expandedNodeIds';
 const ignoredStorageKey = 'workspaceExplorer.showIgnored';
@@ -15,10 +17,24 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
   const [decorations, setDecorations] = useState(() => new Map());
   const [filter, setFilter] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [gitStateByPath, setGitStateByPath] = useState<Map<string, WorkspacePathGitState>>(new Map());
 
   useEffect(() => {
     api.items(new URLSearchParams()).then((items) => setDecorations(buildItemDecorations(items))).catch(() => setDecorations(new Map()));
   }, [workspaces]);
+
+  const loadGitStates = useCallback(async () => {
+    const maps = await Promise.all(workspaces.map(async (workspace) => {
+      try {
+        return buildWorkspaceGitStateMap(workspace.id, await api.workspacePathGitStates(workspace.id));
+      } catch {
+        return new Map<string, WorkspacePathGitState>();
+      }
+    }));
+    setGitStateByPath(new Map(maps.flatMap((map) => [...map.entries()])));
+  }, [workspaces]);
+
+  useEffect(() => { void loadGitStates(); }, [loadGitStates]);
 
   const selection = useMemo<ExplorerSelection | undefined>(() => {
     if (!location?.workspaceId) return undefined;
@@ -68,7 +84,35 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
       const separator = id.indexOf(':');
       void loadDirectory(id.slice(0, separator), id.slice(separator + 1), true);
     }
-  }, [expandedNodeIds, loadDirectory]);
+    void loadGitStates();
+  }, [expandedNodeIds, loadDirectory, loadGitStates]);
+
+  const select = useCallback((workspaceId: string, path: string) => onLocationChange?.({ workspaceId, path: path || undefined }), [onLocationChange]);
+
+  const invalidateDirectories = useCallback(async (workspaceId: string, paths: string[]) => {
+    setCache((current) => {
+      const next = new Map(current);
+      for (const path of paths) {
+        next.delete(directoryCacheKey(workspaceId, path, false));
+        next.delete(directoryCacheKey(workspaceId, path, true));
+      }
+      return next;
+    });
+    await Promise.all(paths.filter((path) => expandedNodeIds.has(explorerNodeId(workspaceId, path))).map((path) => loadDirectory(workspaceId, path, true)));
+    await loadGitStates();
+  }, [expandedNodeIds, loadDirectory, loadGitStates]);
+
+  const expandToPath = useCallback(async (workspaceId: string, path: string, type: 'file' | 'directory' = 'file') => {
+    const ancestors = ancestorDirectoryPaths(path, type);
+    setExpandedNodeIds((current) => {
+      const next = new Set(current);
+      ancestors.forEach((ancestor) => next.add(explorerNodeId(workspaceId, ancestor)));
+      localStorage.setItem(expandedStorageKey, JSON.stringify([...next]));
+      return next;
+    });
+    await Promise.all(ancestors.map((ancestor) => loadDirectory(workspaceId, ancestor)));
+    select(workspaceId, path);
+  }, [loadDirectory, select]);
 
   const collapseAll = useCallback(() => {
     setExpandedNodeIds(new Set());
@@ -96,10 +140,9 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
     directoryPaths.forEach((path) => void loadDirectory(location.workspaceId!, path));
   }, [loadDirectory, location?.path, location?.workspaceId]);
 
-  const select = useCallback((workspaceId: string, path: string) => onLocationChange?.({ workspaceId, path: path || undefined }), [onLocationChange]);
   const rows = useMemo(() => flattenVisibleTree({ workspaces, expandedNodeIds, cache, includeIgnored: showIgnored, decorations, filter }), [cache, decorations, expandedNodeIds, filter, showIgnored, workspaces]);
 
-  return { rows, cache, decorations, expandedNodeIds, showIgnored, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, toggleExpanded, loadDirectory, refresh, collapseAll, select };
+  return { rows, cache, decorations, gitStateByPath, expandedNodeIds, showIgnored, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, toggleExpanded, loadDirectory, refresh, collapseAll, select, invalidateDirectories, expandToPath };
 }
 
 function readExpanded(): Set<string> {
