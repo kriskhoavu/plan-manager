@@ -10,7 +10,7 @@ import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
 export { inferCompatibilityFields, normalizeDroppedPath, parseSources };
 
-const DEFAULT_SOURCES = ['specs', 'docs', 'plans'];
+const DEFAULT_SOURCES = ['docs', 'plans'];
 
 export function WorkspacesPage({ workspaces, onChanged }: { workspaces: WorkspaceConfig[]; onChanged: () => void | Promise<void> }) {
   const [name, setName] = useState('Plan Manager');
