@@ -395,7 +395,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
           </div>
           {!leftCollapsed && (
 			<>
-				<ContentSearchInput label="Search item contents" query={contentSearch.query} onQueryChange={contentSearch.setQuery} caseSensitive={contentSearch.caseSensitive} onCaseSensitiveChange={contentSearch.setCaseSensitive} />
+				<ContentSearchInput label="Search inside this item" query={contentSearch.query} onQueryChange={contentSearch.setQuery} />
 				{contentSearch.query.trim().length >= 2 && <ContentSearchResults {...contentSearch} activeIndex={contentSearchIndex} onActiveIndex={setContentSearchIndex} onOpen={(result) => void openContentResult(result)} onEscape={contentSearch.clear} treeRef={fileTreeRef} showWorkspaceContext={false} />}
 			</>
 		  )}

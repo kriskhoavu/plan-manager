@@ -107,6 +107,42 @@
   padding: 0 7px;
 }
 
+.explorer-panel-header {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.explorer-panel-header strong {
+  font-size: 13px;
+}
+
+.explorer-panel-header select {
+  max-width: 170px;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.explorer-search-context {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  padding: 5px 10px 0;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .explorer-search-results {
   max-height: 280px;
   overflow: auto;
@@ -427,59 +463,30 @@
   text-align: center;
 }
 
-.explorer-mode-control,
-.explorer-search-tabs {
+.explorer-search-context + .explorer-toolbar {
+  min-height: 44px;
+  padding-top: 4px;
+}
+
+.explorer-unified-results > .content-search-result {
+  min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 8px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
-}
-
-.explorer-mode-control button,
-.explorer-search-tabs button {
-  min-height: 32px;
-  border: 1px solid transparent;
+  align-items: initial;
+  gap: 5px;
+  padding: 9px 8px;
   border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
 }
 
-.explorer-mode-control button:hover,
-.explorer-search-tabs button:hover {
-  background: var(--panel-soft);
-  color: var(--text);
+.explorer-unified-results > .content-search-result > .content-search-result-header {
+  display: flex;
 }
 
-.explorer-mode-control button.active,
-.explorer-search-tabs button.active {
-  border-color: color-mix(in srgb, var(--blue) 35%, var(--line));
-  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
-  color: var(--blue);
+.explorer-unified-results > .content-search-result > .content-search-path {
+  display: block;
 }
 
-.explorer-mode-control button:focus-visible,
-.explorer-search-tabs button:focus-visible {
-  outline: 2px solid var(--blue);
-  outline-offset: 1px;
-}
-
-.explorer-search-tabs {
-  padding-top: 0;
-}
-
-.content-toolbar {
-  align-items: stretch;
-}
-
-.content-toolbar .content-search-input {
-  min-width: 0;
-  flex: 1;
-  padding: 0;
-  border: 0;
+.explorer-unified-results > .content-search-result > .content-search-snippet {
+  display: -webkit-box;
 }
 
 @media (max-width: 1180px) {

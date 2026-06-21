@@ -17,6 +17,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 | F3    | Item And Explorer Search UI          | ✅     |
 | F4    | Styling, Accessibility, And Final QA | ✅     |
 | F5    | Compact Search Result UX             | ✅     |
+| F6    | Unified Explorer Search              | ✅     |
 
 ## Backend Phases
 
@@ -218,6 +219,29 @@ PM-009: Compact content search results
 - Preserve keyboard and accessible result context
 ```
 
+### Phase F6: Unified Explorer Search
+
+**Deliverables:**
+
+- [x] Replace the Paths and Content tabs with one search box.
+- [x] Show file-name and text matches in one result list.
+- [x] Infer one-workspace or all-workspace scope from the current selection.
+- [x] Remove the search-scope menu, ignored-files menu, case toggle, and clear icon.
+- [x] Rename tree modes to Planning folders and Entire workspace.
+- [x] Preserve keyboard navigation and safe result opening.
+- [x] Add simplified-search regression coverage.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run`
+
+**Draft Commit:**
+```text
+PM-009: Simplify Explorer search controls
+
+- Merge file-name and text search into one interaction
+- Infer workspace scope from the current selection
+- Remove ambiguous search controls from narrow panels
+```
+
 ## Post-Implementation Checklist
 
 - [x] Confirm item search cannot read sibling item directories.
@@ -225,7 +249,7 @@ PM-009: Compact content search results
 - [x] Confirm All Files preserves PM-008 full-tree behavior.
 - [x] Confirm `.git`, outside symlinks, and binary files are excluded.
 - [x] Confirm ignored preference matches tree and search behavior.
-- [x] Confirm path-name search remains distinct and functional.
+- [x] Confirm path-name search remains functional in unified results.
 - [x] Confirm result selection preserves pending Markdown safely.
 - [x] Run full backend and frontend suites.
 - [x] Run production build and record bundle output.
@@ -233,7 +257,7 @@ PM-009: Compact content search results
 ## Final Verification
 
 - Backend: 147 tests passed across 26 packages.
-- Frontend: 64 tests passed across 22 files.
-- Production: main JavaScript 315.28 kB (91.46 kB gzip); main CSS 70.33 kB (12.61 kB gzip).
+- Frontend: 66 tests passed across 22 files.
+- Production: main JavaScript 315.89 kB (91.68 kB gzip); main CSS 70.44 kB (12.63 kB gzip).
 - Dependencies: Go modules verified and the npm dependency tree resolved; npm audit was unavailable because the configured internal registry did not resolve.
 - Browser automation: unavailable in this session; component tests cover keyboard controls, mode switching, highlighting, and responsive state structure.

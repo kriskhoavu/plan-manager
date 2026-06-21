@@ -40,7 +40,7 @@ PM-008 searches file and directory names. It does not search file contents. Expl
 - [x] Selecting a result opens the file and exposes the matched line context.
 - [x] Empty, stale, loading, truncated, and error states have stable layouts.
 - [x] Keyboard users can enter a query, navigate results, and open a match.
-- [x] Existing path-name search remains available and visually distinct.
+- [x] Existing path-name search remains available in unified Explorer results.
 - [x] Search limits prevent one request from scanning unbounded files or bytes.
 - [x] Existing PM-007 and PM-008 browsing, editing, mutation, and Git behavior remains unchanged.
 - [x] Backend, frontend, and production-build checks pass.

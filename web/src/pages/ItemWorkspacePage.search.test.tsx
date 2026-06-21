@@ -29,7 +29,7 @@ describe('ItemWorkspacePage content search', () => {
 
 	it('searches only the item and opens a matched file with context', async () => {
 		render(<ItemWorkspacePage itemId="item-1" refreshKey={0} onBack={vi.fn()} />);
-		fireEvent.change(await screen.findByRole('textbox', { name: 'Search item contents' }), { target: { value: 'needle' } });
+		fireEvent.change(await screen.findByRole('textbox', { name: 'Search inside this item' }), { target: { value: 'needle' } });
 		const result = await screen.findByRole('option', { name: /README.md/i });
 		fireEvent.click(result);
 		await waitFor(() => expect(apiMock.file).toHaveBeenCalledWith('item-1', 'README_md'));

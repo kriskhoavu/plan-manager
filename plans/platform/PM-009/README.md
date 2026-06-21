@@ -102,15 +102,15 @@ Explorer content search
 
 ## Design Decisions
 
-| Decision                                  | Alternatives Considered           | Rationale                                                         |
-|-------------------------------------------|-----------------------------------|-------------------------------------------------------------------|
-| Default Explorer to configured sources    | Keep full workspace as default    | Planning work normally lives in known roots and needs less noise  |
-| Keep an explicit All Files mode           | Remove full workspace browsing    | Preserves PM-008 behavior and supports repository-wide inspection |
-| Separate path and content search          | Merge both into one result list   | Users can choose between navigation and text matches              |
-| Use bounded in-process scanning           | Shell out to `rg` or add an index | Keeps the binary self-contained and reuses Go path/content guards |
-| Search literal text first                 | Support regex immediately         | Literal search is predictable and easier to bound safely          |
-| Return line-oriented snippets             | Return complete matching files    | Results stay small and useful without exposing large file content |
-| Share one budget across multi-root search | Reset limits for every root       | One request has predictable total work                            |
+| Decision                                  | Alternatives Considered           | Rationale                                                           |
+|-------------------------------------------|-----------------------------------|---------------------------------------------------------------------|
+| Default Explorer to configured sources    | Keep full workspace as default    | Planning work normally lives in known roots and needs less noise    |
+| Keep an explicit All Files mode           | Remove full workspace browsing    | Preserves PM-008 behavior and supports repository-wide inspection   |
+| Unified Explorer search presentation      | Separate Paths and Content tabs   | One input returns file-name and text matches without extra controls |
+| Use bounded in-process scanning           | Shell out to `rg` or add an index | Keeps the binary self-contained and reuses Go path/content guards   |
+| Search literal text first                 | Support regex immediately         | Literal search is predictable and easier to bound safely            |
+| Return line-oriented snippets             | Return complete matching files    | Results stay small and useful without exposing large file content   |
+| Share one budget across multi-root search | Reset limits for every root       | One request has predictable total work                              |
 
 ## Documents
 
@@ -127,5 +127,5 @@ Explorer content search
 - Added `GET /api/items/{id}/content-search` and `GET /api/workspaces/files/content-search`.
 - Added Configured Sources and All Files Explorer modes.
 - Added item and Explorer content-search interfaces with line context and keyboard controls.
-- Verified 147 backend tests and 64 frontend tests.
-- Built production assets with a 315.28 kB main JavaScript bundle and a 70.33 kB main stylesheet.
+- Verified 147 backend tests and 66 frontend tests.
+- Built production assets with a 315.89 kB main JavaScript bundle and a 70.44 kB main stylesheet.

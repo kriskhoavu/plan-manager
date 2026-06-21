@@ -48,7 +48,7 @@ describe('WorkspaceExplorerPage', () => {
     const onLocationChange = vi.fn();
     apiMock.searchWorkspacePaths.mockResolvedValue({ results: [{ id: 'result', workspaceId: 'ws', workspaceName: 'Workspace', name: 'guide.md', path: 'docs/guide.md', type: 'file', ignored: false, context: 'docs' }], truncated: false });
     render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ workspaceId: 'ws' }} onLocationChange={onLocationChange} onOpenKanban={vi.fn()} />);
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search workspace paths' }), { target: { value: 'guide' } });
+		fireEvent.change(screen.getByRole('textbox', { name: 'Search files' }), { target: { value: 'guide' } });
     expect(await screen.findByRole('option', { name: /guide.md/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('option', { name: /guide.md/i }));
     await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', path: 'docs/guide.md' }));
@@ -70,14 +70,19 @@ describe('WorkspaceExplorerPage', () => {
 			truncated: false, filesVisited: 1, bytesRead: 20, skippedFiles: 0
 		});
 		render(<WorkspaceExplorerPage workspaces={[{ ...workspace, sources: ['docs'] }]} location={{ workspaceId: 'ws' }} onLocationChange={onLocationChange} onOpenKanban={vi.fn()} />);
-		fireEvent.click(screen.getByRole('button', { name: 'All Files' }));
+		fireEvent.change(screen.getByRole('combobox', { name: 'Explorer tree mode' }), { target: { value: 'all' } });
 		expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', mode: 'all' });
-		fireEvent.click(screen.getByRole('tab', { name: 'Content' }));
-		fireEvent.change(screen.getByRole('textbox', { name: 'Search file contents' }), { target: { value: 'needle' } });
+		fireEvent.change(screen.getByRole('textbox', { name: 'Search files' }), { target: { value: 'needle' } });
 		const result = await screen.findByRole('option', { name: /guide.md/i });
 		expect(result.querySelector('mark')).toHaveTextContent('needle');
 		fireEvent.click(result);
 		await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', path: 'docs/guide.md' }));
 		expect(document.querySelector('.content-match-context')).toHaveTextContent('Line 7, columns 3–9');
+		expect(screen.getByRole('textbox', { name: 'Search files' })).toHaveValue('');
+		expect(screen.queryByRole('option', { name: /guide.md/i })).not.toBeInTheDocument();
+		expect(screen.queryByText('Paths')).not.toBeInTheDocument();
+		expect(screen.queryByText('Content')).not.toBeInTheDocument();
+		expect(screen.queryByLabelText('Search options')).not.toBeInTheDocument();
+		expect(screen.getAllByRole('combobox')).toHaveLength(1);
 	});
 });

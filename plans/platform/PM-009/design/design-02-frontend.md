@@ -63,8 +63,8 @@ interface ContentSearchSelection {
 
 ### Explorer
 
-- Keep PM-008 path search available under a Paths tab.
-- Add a Content tab using the same toolbar region.
+- Use one Explorer search box for PM-008 path matches and content matches.
+- Keep the path and content API contracts separate behind the unified result list.
 - Sources mode requests `mode=sources`.
 - All Files mode requests `mode=all`.
 - Search scope continues to support Current and All workspaces.

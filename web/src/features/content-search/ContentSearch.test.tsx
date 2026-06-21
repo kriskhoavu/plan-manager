@@ -1,10 +1,16 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ContentSearchResults } from './ContentSearch';
+import { ContentSearchInput, ContentSearchResults } from './ContentSearch';
 
 const result = { id: 'one', workspaceId: 'ws', workspaceName: 'Workspace', path: 'docs/a.md', name: 'a.md', kind: 'markdown' as const, language: 'markdown', lineNumber: 2, columnStart: 3, columnEnd: 9, snippet: 'A needle here', ignored: false };
 
 describe('ContentSearchResults', () => {
+	it('uses one plain input without ambiguous adjacent controls', () => {
+		render(<ContentSearchInput query="needle" onQueryChange={vi.fn()} label="Search inside this item" />);
+		expect(screen.getByRole('textbox', { name: 'Search inside this item' })).toHaveValue('needle');
+		expect(screen.queryByText('Aa')).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /clear/i })).not.toBeInTheDocument();
+	});
 	it('highlights matches and supports keyboard opening and clearing', () => {
 		const onOpen = vi.fn();
 		const onEscape = vi.fn();

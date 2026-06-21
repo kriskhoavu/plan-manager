@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   ChevronDown, ChevronRight, Clipboard, Code2, Eye, File, Folder, FolderGit2, GitCompare,
-  FilePlus2, FolderPlus, KanbanSquare, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, RotateCcw, Search, Settings2, X
+  FilePlus2, FolderPlus, KanbanSquare, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, RotateCcw, Search, X
 } from 'lucide-react';
 import type { ExplorerLocation } from '../app/router';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -17,13 +17,13 @@ import { useWorkspacePathMutations } from '../features/workspace-explorer/useWor
 import { ApiError, api } from '../lib/api';
 import type { GitStatus, ItemSummary, WorkspaceConfig, WorkspaceHealth, WorkspacePathGitState, WorkspacePathSearchResult } from '../lib/types';
 import { parseGitDiff } from '../shared/domain/diff';
-import { ContentSearchInput, ContentSearchResults } from '../features/content-search/ContentSearch';
+import { ContentSearchResultRow } from '../features/content-search/ContentSearch';
 import { useContentSearch } from '../features/content-search/useContentSearch';
 import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
 
 type EditorTab = 'preview' | 'raw' | 'diff';
 type PathDialog = { kind: 'file' | 'directory' | 'rename'; parentPath: string; currentPath?: string; initialName?: string };
-type SearchTab = 'paths' | 'content';
+type ExplorerUnifiedResult = { kind: 'path'; result: WorkspacePathSearchResult } | { kind: 'content'; result: WorkspaceContentSearchResult };
 
 export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, onOpenKanban }: {
   workspaces: WorkspaceConfig[];
@@ -41,18 +41,19 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [leftWidth, setLeftWidth] = useState(() => boundedNumber(localStorage.getItem('workspaceExplorer.leftWidth'), 340));
   const [rightWidth, setRightWidth] = useState(() => boundedNumber(localStorage.getItem('workspaceExplorer.rightWidth'), 300));
-  const [searchAll, setSearchAll] = useState(!location?.workspaceId);
   const [searchIndex, setSearchIndex] = useState(0);
   const [pathDialog, setPathDialog] = useState<PathDialog | null>(null);
-	const [searchTab, setSearchTab] = useState<SearchTab>('paths');
-	const [contentSearchIndex, setContentSearchIndex] = useState(0);
 	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
 	const treeRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const workspace = workspaces.find((item) => item.id === location?.workspaceId);
   const selectedRow = explorer.rows.find((row) => explorerNodeId(row.workspaceId, row.node.path) === explorer.selection?.nodeId);
-  const pathSearch = useWorkspacePathSearch({ workspaceId: searchAll || !location?.workspaceId ? undefined : location.workspaceId, includeIgnored: explorer.showIgnored });
-	const contentSearch = useContentSearch({ kind: 'explorer', mode: explorer.mode, workspaceId: searchAll || !location?.workspaceId ? undefined : location.workspaceId, includeIgnored: explorer.showIgnored });
+	const pathSearch = useWorkspacePathSearch({ workspaceId: location?.workspaceId, includeIgnored: explorer.showIgnored });
+	const contentSearch = useContentSearch({ kind: 'explorer', mode: explorer.mode, workspaceId: location?.workspaceId, includeIgnored: explorer.showIgnored });
+	const searchResults = useMemo<ExplorerUnifiedResult[]>(() => [
+		...pathSearch.results.slice(0, 5).map((result) => ({ kind: 'path' as const, result })),
+		...contentSearch.results.slice(0, 15).map((result) => ({ kind: 'content' as const, result }))
+	], [contentSearch.results, pathSearch.results]);
   const mutations = useWorkspacePathMutations(async (result) => {
     await explorer.invalidateDirectories(result.workspaceId, result.invalidatedPaths);
     await explorer.expandToPath(result.workspaceId, result.path, result.type);
@@ -106,7 +107,8 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
   const openSearchResult = async (result: WorkspacePathSearchResult) => {
     if (editor.dirty && !(await editor.saveNow())) return;
     await explorer.expandToPath(result.workspaceId, result.path, result.type);
-    pathSearch.setQuery('');
+		pathSearch.setQuery('');
+		contentSearch.clear();
     setSearchIndex(0);
   };
 
@@ -114,9 +116,22 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
 		if (editor.dirty && !(await editor.saveNow())) return;
 		setMatchContext({ workspaceId: result.workspaceId, path: result.path, lineNumber: result.lineNumber, columnStart: result.columnStart, columnEnd: result.columnEnd });
 		await explorer.expandToPath(result.workspaceId, result.path, 'file');
+		pathSearch.setQuery('');
+		contentSearch.clear();
+		setSearchIndex(0);
 	};
 
-	useEffect(() => { setMatchContext(null); setContentSearchIndex(0); }, [contentSearch.query]);
+	const setExplorerSearchQuery = (query: string) => {
+		pathSearch.setQuery(query);
+		contentSearch.setQuery(query);
+		setMatchContext(null);
+		setSearchIndex(0);
+	};
+
+	const openUnifiedSearchResult = (entry: ExplorerUnifiedResult) => {
+		if (entry.kind === 'path') void openSearchResult(entry.result);
+		else void openContentResult(entry.result);
+	};
 
   const selectedParentPath = () => {
     if (!selectedRow || selectedRow.node.type === 'workspace') return '';
@@ -224,37 +239,23 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
       </header>
       <div className="explorer-grid" style={gridStyle} ref={gridRef}>
         <aside className="explorer-tree-panel">
-		  <div className="explorer-mode-control" role="group" aria-label="Explorer tree mode">
-			<button type="button" aria-pressed={explorer.mode === 'sources'} className={explorer.mode === 'sources' ? 'active' : ''} onClick={() => explorer.setMode('sources')}>Configured Sources</button>
-			<button type="button" aria-pressed={explorer.mode === 'all'} className={explorer.mode === 'all' ? 'active' : ''} onClick={() => explorer.setMode('all')}>All Files</button>
+		  <div className="explorer-panel-header">
+			<strong>Files</strong>
+			<select aria-label="Explorer tree mode" value={explorer.mode} onChange={(event) => explorer.setMode(event.target.value as 'sources' | 'all')}>
+				<option value="sources">Planning folders</option>
+				<option value="all">Entire workspace</option>
+			</select>
 		  </div>
-		  <div className="explorer-search-tabs" role="tablist" aria-label="Explorer search type">
-			<button type="button" role="tab" aria-selected={searchTab === 'paths'} className={searchTab === 'paths' ? 'active' : ''} onClick={() => setSearchTab('paths')}>Paths</button>
-			<button type="button" role="tab" aria-selected={searchTab === 'content'} className={searchTab === 'content' ? 'active' : ''} onClick={() => setSearchTab('content')}>Content</button>
+		  <div className="explorer-search-context">Search in {workspace?.name ?? 'all workspaces'}</div>
+		  <div className="explorer-toolbar">
+			<label><Search size={15} /><input aria-label="Search files" value={pathSearch.query} onChange={(event) => setExplorerSearchQuery(event.target.value)} onKeyDown={(event) => {
+			  if (event.key === 'ArrowDown' && searchResults.length) { event.preventDefault(); setSearchIndex((index) => Math.min(index + 1, searchResults.length - 1)); }
+			  if (event.key === 'ArrowUp' && searchResults.length) { event.preventDefault(); setSearchIndex((index) => Math.max(index - 1, 0)); }
+			  if (event.key === 'Enter' && searchResults.length) { event.preventDefault(); openUnifiedSearchResult(searchResults[searchIndex] ?? searchResults[0]); }
+			  if (event.key === 'Escape') setExplorerSearchQuery('');
+			}} placeholder="Search files and text" /></label>
 		  </div>
-		  {searchTab === 'paths' ? <>
-          <div className="explorer-toolbar">
-            <label><Search size={15} /><input aria-label="Search workspace paths" value={pathSearch.query} onChange={(event) => { pathSearch.setQuery(event.target.value); setSearchIndex(0); }} onKeyDown={(event) => {
-              if (event.key === 'ArrowDown' && pathSearch.results.length) { event.preventDefault(); setSearchIndex((index) => Math.min(index + 1, pathSearch.results.length - 1)); }
-              if (event.key === 'ArrowUp' && pathSearch.results.length) { event.preventDefault(); setSearchIndex((index) => Math.max(index - 1, 0)); }
-              if (event.key === 'Enter' && pathSearch.results.length) { event.preventDefault(); void openSearchResult(pathSearch.results[searchIndex] ?? pathSearch.results[0]); }
-              if (event.key === 'Escape') { pathSearch.setQuery(''); setSearchIndex(0); }
-            }} placeholder="Search workspace paths" /></label>
-            <select aria-label="Path search scope" value={searchAll || !location?.workspaceId ? 'all' : 'current'} onChange={(event) => setSearchAll(event.target.value === 'all')}>
-              <option value="current" disabled={!location?.workspaceId}>Current</option><option value="all">All</option>
-            </select>
-            <button className={explorer.showIgnored ? 'icon-button active' : 'icon-button'} type="button" title="Show ignored files" onClick={() => explorer.setShowIgnored(!explorer.showIgnored)}><Settings2 size={16} /></button>
-          </div>
-          {pathSearch.query.trim() && <ExplorerSearchResults {...pathSearch} activeIndex={searchIndex} onActiveIndex={setSearchIndex} onOpen={(result) => void openSearchResult(result)} />}
-		  </> : <>
-			<div className="explorer-toolbar content-toolbar">
-			  <ContentSearchInput label="Search file contents" query={contentSearch.query} onQueryChange={contentSearch.setQuery} caseSensitive={contentSearch.caseSensitive} onCaseSensitiveChange={contentSearch.setCaseSensitive} />
-			  <select aria-label="Content search scope" value={searchAll || !location?.workspaceId ? 'all' : 'current'} onChange={(event) => setSearchAll(event.target.value === 'all')}>
-				<option value="current" disabled={!location?.workspaceId}>Current</option><option value="all">All</option>
-			  </select>
-			</div>
-			{contentSearch.query.trim().length >= 2 && <ContentSearchResults {...contentSearch} activeIndex={contentSearchIndex} onActiveIndex={setContentSearchIndex} onOpen={(result) => void openContentResult(result)} onEscape={contentSearch.clear} treeRef={treeRef} />}
-		  </>}
+		  {pathSearch.query.trim() && <ExplorerUnifiedSearchResults query={pathSearch.query} results={searchResults} loading={pathSearch.loading || contentSearch.loading} error={pathSearch.error || contentSearch.error} activeIndex={searchIndex} onActiveIndex={setSearchIndex} onOpen={openUnifiedSearchResult} />}
 		  <div className="explorer-tree" ref={treeRef} role="tree" aria-label="Workspace files" tabIndex={0} onKeyDown={onTreeKeyDown}>
             {explorer.rows.map((row, index) => (
               <ExplorerTreeRow key={explorerNodeId(row.workspaceId, row.node.path)} row={row} gitState={explorer.gitStateByPath.get(explorerNodeId(row.workspaceId, row.node.path))} active={index === explorer.activeIndex} selected={explorer.selection?.nodeId === explorerNodeId(row.workspaceId, row.node.path)} expanded={explorer.expandedNodeIds.has(explorerNodeId(row.workspaceId, row.node.path))} onFocus={() => explorer.setActiveIndex(index)} onSelect={() => void selectRow(row)} onToggle={() => toggleRow(row)} />
@@ -312,22 +313,21 @@ function ExplorerTreeRow({ row, gitState, active, selected, expanded, onFocus, o
   </div>;
 }
 
-function ExplorerSearchResults({ results, truncated, loading, error, activeIndex, onActiveIndex, onOpen }: { results: WorkspacePathSearchResult[]; truncated: boolean; loading: boolean; error: string; activeIndex: number; onActiveIndex: (index: number) => void; onOpen: (result: WorkspacePathSearchResult) => void }) {
-  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+function ExplorerUnifiedSearchResults({ query, results, loading, error, activeIndex, onActiveIndex, onOpen }: { query: string; results: ExplorerUnifiedResult[]; loading: boolean; error: string; activeIndex: number; onActiveIndex: (index: number) => void; onOpen: (result: ExplorerUnifiedResult) => void }) {
+	const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!results.length) return;
     if (event.key === 'ArrowDown') { event.preventDefault(); onActiveIndex(Math.min(activeIndex + 1, results.length - 1)); }
     if (event.key === 'ArrowUp') { event.preventDefault(); onActiveIndex(Math.max(activeIndex - 1, 0)); }
     if (event.key === 'Enter') { event.preventDefault(); onOpen(results[activeIndex] ?? results[0]); }
   };
-  return <div className="explorer-search-results" role="listbox" aria-label="Workspace path search results" tabIndex={0} onKeyDown={onKeyDown}>
-    {loading && <span className="explorer-search-message">Searching...</span>}
-    {error && <span className="explorer-search-message error">{error}</span>}
-    {!loading && !error && results.length === 0 && <span className="explorer-search-message">No matching paths.</span>}
-    {results.map((result, index) => <button key={result.id} role="option" aria-selected={index === activeIndex} className={index === activeIndex ? 'active' : ''} onMouseEnter={() => onActiveIndex(index)} onClick={() => onOpen(result)}>
-      {result.type === 'directory' ? <Folder size={15} /> : <File size={15} />}<span><strong>{result.name}</strong><small>{result.workspaceName} · {result.context || 'root'}</small></span>{result.ignored && <i>ignored</i>}
-    </button>)}
-    {truncated && <span className="explorer-search-message">More matches exist. Refine the query.</span>}
-  </div>;
+	return <div className="explorer-search-results explorer-unified-results" role="listbox" aria-label="File search results" tabIndex={0} onKeyDown={onKeyDown}>
+		{loading && <span className="explorer-search-message">Searching...</span>}
+		{error && <span className="explorer-search-message error">{error}</span>}
+		{!loading && !error && results.length === 0 && <span className="explorer-search-message">No matching files or text.</span>}
+		{results.map((entry, index) => entry.kind === 'path' ? <button key={`path:${entry.result.id}`} role="option" aria-selected={index === activeIndex} className={index === activeIndex ? 'active' : ''} onMouseEnter={() => onActiveIndex(index)} onClick={() => onOpen(entry)}>
+		  {entry.result.type === 'directory' ? <Folder size={15} /> : <File size={15} />}<span><strong>{entry.result.name}</strong><small>{entry.result.workspaceName} · {entry.result.context || 'root'}</small></span>
+		</button> : <ContentSearchResultRow key={`content:${entry.result.id}`} result={entry.result} query={query} active={index === activeIndex} onActive={() => onActiveIndex(index)} onOpen={() => onOpen(entry)} />)}
+	</div>;
 }
 
 function ExplorerPathDialog({ dialog, busy, error, onCancel, onSubmit }: { dialog: PathDialog; busy: boolean; error: string; onCancel: () => void; onSubmit: (name: string) => Promise<boolean> }) {

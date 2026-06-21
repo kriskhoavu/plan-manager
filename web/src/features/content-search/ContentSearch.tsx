@@ -1,21 +1,17 @@
 import type { KeyboardEvent, RefObject } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search } from 'lucide-react';
 import type { WorkspaceContentSearchResult } from '../../lib/types';
 
 const maxVisibleResults = 20;
 const maxVisibleSnippetCharacters = 120;
 
-export function ContentSearchInput({ query, onQueryChange, caseSensitive, onCaseSensitiveChange, label }: {
+export function ContentSearchInput({ query, onQueryChange, label }: {
 	query: string;
 	onQueryChange: (query: string) => void;
-	caseSensitive: boolean;
-	onCaseSensitiveChange: (value: boolean) => void;
 	label: string;
 }) {
 	return <div className="content-search-input" role="search">
 		<label><Search size={15} /><input aria-label={label} value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder={label} /></label>
-		<label className="content-search-case"><input type="checkbox" checked={caseSensitive} onChange={(event) => onCaseSensitiveChange(event.target.checked)} /> Aa</label>
-		{query && <button className="icon-button" type="button" aria-label="Clear content search" onClick={() => onQueryChange('')}><X size={14} /></button>}
 	</div>;
 }
 
@@ -49,14 +45,25 @@ export function ContentSearchResults({ query, results, truncated, loading, error
 		<div className="content-search-live" aria-live="polite">{loading ? 'Searching file contents…' : `${results.length} content matches`}</div>
 		{error && <p className="content-search-message error">{error}</p>}
 		{!loading && !error && results.length === 0 && <p className="content-search-message">No content matches.</p>}
-		{visibleResults.map((result, index) => <button key={result.id} type="button" role="option" aria-label={`${result.name}, line ${result.lineNumber}, columns ${result.columnStart} to ${result.columnEnd}`} aria-selected={index === activeIndex} className={index === activeIndex ? 'active' : ''} title={`${result.workspaceName} · ${result.path}`} onMouseEnter={() => onActiveIndex(index)} onClick={() => onOpen(result)}>
-			<span className="content-search-result-header"><strong>{result.name}</strong><span className="content-search-line">L{result.lineNumber}</span></span>
-			<span className="content-search-path">{showWorkspaceContext && <>{result.workspaceName} · </>}{compactParentPath(result.path)}</span>
-			<span className="content-search-snippet">{highlightSnippet(compactSnippet(result.snippet, query), query, result.id)}</span>
-		</button>)}
+		{visibleResults.map((result, index) => <ContentSearchResultRow key={result.id} result={result} query={query} active={index === activeIndex} showWorkspaceContext={showWorkspaceContext} onActive={() => onActiveIndex(index)} onOpen={() => onOpen(result)} />)}
 		{results.length > maxVisibleResults && <p className="content-search-message">Showing the first {maxVisibleResults} of {results.length} matches. Refine the query to narrow the list.</p>}
 		{truncated && results.length <= maxVisibleResults && <p className="content-search-message">More matches exist. Refine the query.</p>}
 	</div>;
+}
+
+export function ContentSearchResultRow({ result, query, active, onActive, onOpen, showWorkspaceContext = true }: {
+	result: WorkspaceContentSearchResult;
+	query: string;
+	active: boolean;
+	onActive: () => void;
+	onOpen: () => void;
+	showWorkspaceContext?: boolean;
+}) {
+	return <button type="button" role="option" aria-label={`${result.name}, line ${result.lineNumber}, columns ${result.columnStart} to ${result.columnEnd}`} aria-selected={active} className={`content-search-result${active ? ' active' : ''}`} title={`${result.workspaceName} · ${result.path}`} onMouseEnter={onActive} onClick={onOpen}>
+		<span className="content-search-result-header"><strong>{result.name}</strong><span className="content-search-line">L{result.lineNumber}</span></span>
+		<span className="content-search-path">{showWorkspaceContext && <>{result.workspaceName} · </>}{compactParentPath(result.path)}</span>
+		<span className="content-search-snippet">{highlightSnippet(compactSnippet(result.snippet, query), query, result.id)}</span>
+	</button>;
 }
 
 function compactParentPath(path: string): string {
