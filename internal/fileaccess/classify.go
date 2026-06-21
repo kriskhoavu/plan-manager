@@ -92,3 +92,7 @@ func isBinary(data []byte) bool {
 	}
 	return bytes.IndexByte(data, 0) >= 0 || !utf8.Valid(data)
 }
+
+func IsBinary(data []byte) bool {
+	return isBinary(data)
+}

@@ -8,7 +8,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 
 | Phase | Name                                 | Status |
 |-------|--------------------------------------|--------|
-| B1    | Content Search Domain And Budgets    |        |
+| B1    | Content Search Domain And Budgets    | ✅     |
 | B2    | Scope Resolution And Application     |        |
 | B3    | Item And Explorer Search APIs        |        |
 | B4    | Search Safety And Scale Tests        |        |
@@ -23,12 +23,12 @@ Add bounded content search to item details and Explorer. Make configured workspa
 
 **Deliverables:**
 
-- [ ] Add content-search request, result, response, and budget models.
-- [ ] Add literal UTF-8 line matching and bounded snippets.
-- [ ] Reuse PM-006 classification and binary detection.
-- [ ] Add result, file, byte, file-size, and query-length limits.
-- [ ] Support context cancellation.
-- [ ] Cover case sensitivity, Unicode, line/column, and snippets.
+- [x] Add content-search request, result, response, and budget models.
+- [x] Add literal UTF-8 line matching and bounded snippets.
+- [x] Reuse PM-006 classification and binary detection.
+- [x] Add result, file, byte, file-size, and query-length limits.
+- [x] Support context cancellation.
+- [x] Cover case sensitivity, Unicode, line/column, and snippets.
 
 **Verification:** `rtk go test ./internal/workspacefiles ./internal/fileaccess`
 

@@ -292,6 +292,53 @@ type WorkspacePathSearchResponse struct {
 	Truncated bool                        `json:"truncated" yaml:"truncated"`
 }
 
+type WorkspaceContentSearchRequest struct {
+	Query          string `json:"query" yaml:"query"`
+	CaseSensitive  bool   `json:"caseSensitive" yaml:"caseSensitive"`
+	IncludeIgnored bool   `json:"includeIgnored" yaml:"includeIgnored"`
+}
+
+type WorkspaceContentSearchRoot struct {
+	Path string `json:"path" yaml:"path"`
+}
+
+type WorkspaceContentSearchResult struct {
+	ID            string   `json:"id" yaml:"id"`
+	WorkspaceID   string   `json:"workspaceId" yaml:"workspaceId"`
+	WorkspaceName string   `json:"workspaceName" yaml:"workspaceName"`
+	ItemID        string   `json:"itemId,omitempty" yaml:"itemId,omitempty"`
+	Path          string   `json:"path" yaml:"path"`
+	FileID        string   `json:"fileId,omitempty" yaml:"fileId,omitempty"`
+	Name          string   `json:"name" yaml:"name"`
+	Kind          FileKind `json:"kind" yaml:"kind"`
+	Language      string   `json:"language" yaml:"language"`
+	LineNumber    int      `json:"lineNumber" yaml:"lineNumber"`
+	ColumnStart   int      `json:"columnStart" yaml:"columnStart"`
+	ColumnEnd     int      `json:"columnEnd" yaml:"columnEnd"`
+	Snippet       string   `json:"snippet" yaml:"snippet"`
+	Ignored       bool     `json:"ignored" yaml:"ignored"`
+}
+
+type WorkspaceContentSearchResponse struct {
+	Results      []WorkspaceContentSearchResult `json:"results" yaml:"results"`
+	Truncated    bool                           `json:"truncated" yaml:"truncated"`
+	FilesVisited int                            `json:"filesVisited" yaml:"filesVisited"`
+	BytesRead    int64                          `json:"bytesRead" yaml:"bytesRead"`
+	SkippedFiles int                            `json:"skippedFiles" yaml:"skippedFiles"`
+}
+
+type WorkspaceContentSearchBudget struct {
+	MaxResults       int   `json:"maxResults" yaml:"maxResults"`
+	MaxFiles         int   `json:"maxFiles" yaml:"maxFiles"`
+	MaxBytes         int64 `json:"maxBytes" yaml:"maxBytes"`
+	MaxFileSize      int64 `json:"maxFileSize" yaml:"maxFileSize"`
+	MaxQueryLength   int   `json:"maxQueryLength" yaml:"maxQueryLength"`
+	MaxSnippetLength int   `json:"maxSnippetLength" yaml:"maxSnippetLength"`
+	Results          int   `json:"-" yaml:"-"`
+	FilesVisited     int   `json:"-" yaml:"-"`
+	BytesRead        int64 `json:"-" yaml:"-"`
+}
+
 type WorkspacePathGitState struct {
 	Path     string          `json:"path" yaml:"path"`
 	OldPath  string          `json:"oldPath,omitempty" yaml:"oldPath,omitempty"`
