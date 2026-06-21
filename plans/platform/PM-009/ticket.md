@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft
+Implemented
 
 ## User Story
 
@@ -26,24 +26,24 @@ PM-008 searches file and directory names. It does not search file contents. Expl
 
 ## Acceptance Criteria
 
-- [ ] Item details can search supported text files under the selected item directory.
-- [ ] Item search cannot read sibling items or paths outside the item root.
-- [ ] Explorer defaults to Configured Sources mode.
-- [ ] Configured Sources mode shows only `WorkspaceConfig.sources` below each workspace.
-- [ ] Explorer offers an explicit All Files mode that preserves the current full tree.
-- [ ] Explorer content search uses only configured sources in Sources mode.
-- [ ] Explorer content search uses the guarded workspace root in All Files mode.
-- [ ] Explorer search supports all workspaces and one selected workspace.
-- [ ] Ignored paths follow the Show ignored preference in tree and content search.
-- [ ] `.git`, binary files, unsupported content, and outside symlinks never appear in results.
-- [ ] Results show workspace or item context, relative path, line number, and a bounded snippet.
-- [ ] Selecting a result opens the file and exposes the matched line context.
-- [ ] Empty, stale, loading, truncated, and error states have stable layouts.
-- [ ] Keyboard users can enter a query, navigate results, and open a match.
-- [ ] Existing path-name search remains available and visually distinct.
-- [ ] Search limits prevent one request from scanning unbounded files or bytes.
-- [ ] Existing PM-007 and PM-008 browsing, editing, mutation, and Git behavior remains unchanged.
-- [ ] Backend, frontend, and production-build checks pass.
+- [x] Item details can search supported text files under the selected item directory.
+- [x] Item search cannot read sibling items or paths outside the item root.
+- [x] Explorer defaults to Configured Sources mode.
+- [x] Configured Sources mode shows only `WorkspaceConfig.sources` below each workspace.
+- [x] Explorer offers an explicit All Files mode that preserves the current full tree.
+- [x] Explorer content search uses only configured sources in Sources mode.
+- [x] Explorer content search uses the guarded workspace root in All Files mode.
+- [x] Explorer search supports all workspaces and one selected workspace.
+- [x] Ignored paths follow the Show ignored preference in tree and content search.
+- [x] `.git`, binary files, unsupported content, and outside symlinks never appear in results.
+- [x] Results show workspace or item context, relative path, line number, and a bounded snippet.
+- [x] Selecting a result opens the file and exposes the matched line context.
+- [x] Empty, stale, loading, truncated, and error states have stable layouts.
+- [x] Keyboard users can enter a query, navigate results, and open a match.
+- [x] Existing path-name search remains available and visually distinct.
+- [x] Search limits prevent one request from scanning unbounded files or bytes.
+- [x] Existing PM-007 and PM-008 browsing, editing, mutation, and Git behavior remains unchanged.
+- [x] Backend, frontend, and production-build checks pass.
 
 ## Default Limits
 

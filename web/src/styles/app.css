@@ -1,5 +1,6 @@
 @import "./app-shell.css";
 @import "../features/workspace-explorer/workspace-explorer.css";
+@import "../features/content-search/content-search.css";
 
 :root {
   color-scheme: light;

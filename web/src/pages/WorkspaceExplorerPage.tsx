@@ -225,12 +225,12 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
       <div className="explorer-grid" style={gridStyle} ref={gridRef}>
         <aside className="explorer-tree-panel">
 		  <div className="explorer-mode-control" role="group" aria-label="Explorer tree mode">
-			<button type="button" className={explorer.mode === 'sources' ? 'active' : ''} onClick={() => explorer.setMode('sources')}>Configured Sources</button>
-			<button type="button" className={explorer.mode === 'all' ? 'active' : ''} onClick={() => explorer.setMode('all')}>All Files</button>
+			<button type="button" aria-pressed={explorer.mode === 'sources'} className={explorer.mode === 'sources' ? 'active' : ''} onClick={() => explorer.setMode('sources')}>Configured Sources</button>
+			<button type="button" aria-pressed={explorer.mode === 'all'} className={explorer.mode === 'all' ? 'active' : ''} onClick={() => explorer.setMode('all')}>All Files</button>
 		  </div>
 		  <div className="explorer-search-tabs" role="tablist" aria-label="Explorer search type">
-			<button role="tab" aria-selected={searchTab === 'paths'} className={searchTab === 'paths' ? 'active' : ''} onClick={() => setSearchTab('paths')}>Paths</button>
-			<button role="tab" aria-selected={searchTab === 'content'} className={searchTab === 'content' ? 'active' : ''} onClick={() => setSearchTab('content')}>Content</button>
+			<button type="button" role="tab" aria-selected={searchTab === 'paths'} className={searchTab === 'paths' ? 'active' : ''} onClick={() => setSearchTab('paths')}>Paths</button>
+			<button type="button" role="tab" aria-selected={searchTab === 'content'} className={searchTab === 'content' ? 'active' : ''} onClick={() => setSearchTab('content')}>Content</button>
 		  </div>
 		  {searchTab === 'paths' ? <>
           <div className="explorer-toolbar">

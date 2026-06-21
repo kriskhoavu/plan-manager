@@ -96,9 +96,9 @@ Explorer content search
 | Backend  | `internal/application/contentsearch`        | Resolve item, workspace, tree mode, roots, and shared budgets |
 | Backend  | Content-search API routes                   | Expose item-scoped and Explorer-scoped content search         |
 | Frontend | `features/content-search`                   | Own query, debounce, scope, stale-request, and result state   |
-| Frontend | `ItemContentSearch`                         | Search and open matches inside one item directory             |
-| Frontend | `ExplorerContentSearch`                     | Search matches inside the active Explorer tree mode           |
-| Frontend | `ExplorerTreeModeControl`                   | Switch between Configured Sources and All Files               |
+| Frontend | `ContentSearchInput`                        | Provide query, case sensitivity, and clear controls           |
+| Frontend | `ContentSearchResults`                      | Render keyboard-accessible highlighted line matches           |
+| Frontend | `useWorkspaceExplorer`                      | Compose and persist Configured Sources and All Files modes    |
 
 ## Design Decisions
 
@@ -119,3 +119,13 @@ Explorer content search
 - [Backend Design](design/design-01-backend.md)
 - [Frontend Design](design/design-02-frontend.md)
 - [Implementation Plan](implementation-plan.md)
+
+## Implementation Result
+
+- Added bounded literal scanning in `internal/workspacefiles/content_search.go`.
+- Added scoped root resolution in `internal/application/contentsearch`.
+- Added `GET /api/items/{id}/content-search` and `GET /api/workspaces/files/content-search`.
+- Added Configured Sources and All Files Explorer modes.
+- Added item and Explorer content-search interfaces with line context and keyboard controls.
+- Verified 147 backend tests and 64 frontend tests.
+- Built production assets with a 315.28 kB main JavaScript bundle and a 70.33 kB main stylesheet.

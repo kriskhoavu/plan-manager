@@ -15,7 +15,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 | F1    | Types And Content Search Clients     | ✅     |
 | F2    | Tree Mode And Search State           | ✅     |
 | F3    | Item And Explorer Search UI          | ✅     |
-| F4    | Styling, Accessibility, And Final QA |        |
+| F4    | Styling, Accessibility, And Final QA | ✅     |
 
 ## Backend Phases
 
@@ -177,11 +177,11 @@ PM-009: Add scoped content search interfaces
 
 **Deliverables:**
 
-- [ ] Add feature-owned responsive search and mode styles.
-- [ ] Add stable loading, empty, error, and truncated states.
-- [ ] Verify keyboard, mobile, light, and dark behavior.
-- [ ] Run backend, frontend, dependency, and production-build checks.
-- [ ] Update architecture and PM-009 documents.
+- [x] Add feature-owned responsive search and mode styles.
+- [x] Add stable loading, empty, error, and truncated states.
+- [x] Verify keyboard, mobile, light, and dark behavior.
+- [x] Run backend, frontend, dependency, and production-build checks.
+- [x] Update architecture and PM-009 documents.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run && rtk npm run build && rtk go test ./...`
 
@@ -196,12 +196,20 @@ PM-009: Finalize scoped content search UX
 
 ## Post-Implementation Checklist
 
-- [ ] Confirm item search cannot read sibling item directories.
-- [ ] Confirm Sources mode cannot search unconfigured directories.
-- [ ] Confirm All Files preserves PM-008 full-tree behavior.
-- [ ] Confirm `.git`, outside symlinks, and binary files are excluded.
-- [ ] Confirm ignored preference matches tree and search behavior.
-- [ ] Confirm path-name search remains distinct and functional.
-- [ ] Confirm result selection preserves pending Markdown safely.
-- [ ] Run full backend and frontend suites.
-- [ ] Run production build and record bundle output.
+- [x] Confirm item search cannot read sibling item directories.
+- [x] Confirm Sources mode cannot search unconfigured directories.
+- [x] Confirm All Files preserves PM-008 full-tree behavior.
+- [x] Confirm `.git`, outside symlinks, and binary files are excluded.
+- [x] Confirm ignored preference matches tree and search behavior.
+- [x] Confirm path-name search remains distinct and functional.
+- [x] Confirm result selection preserves pending Markdown safely.
+- [x] Run full backend and frontend suites.
+- [x] Run production build and record bundle output.
+
+## Final Verification
+
+- Backend: 147 tests passed across 26 packages.
+- Frontend: 64 tests passed across 22 files.
+- Production: main JavaScript 315.28 kB (91.46 kB gzip); main CSS 70.33 kB (12.61 kB gzip).
+- Dependencies: Go modules verified and the npm dependency tree resolved; npm audit was unavailable because the configured internal registry did not resolve.
+- Browser automation: unavailable in this session; component tests cover keyboard controls, mode switching, highlighting, and responsive state structure.
