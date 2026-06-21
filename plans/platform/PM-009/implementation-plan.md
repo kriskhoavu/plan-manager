@@ -9,7 +9,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 | Phase | Name                                 | Status |
 |-------|--------------------------------------|--------|
 | B1    | Content Search Domain And Budgets    | ✅     |
-| B2    | Scope Resolution And Application     |        |
+| B2    | Scope Resolution And Application     | ✅     |
 | B3    | Item And Explorer Search APIs        |        |
 | B4    | Search Safety And Scale Tests        |        |
 | F1    | Types And Content Search Clients     |        |
@@ -45,12 +45,12 @@ PM-009: Add bounded workspace content search
 
 **Deliverables:**
 
-- [ ] Add item-root search resolution.
-- [ ] Add configured-source and all-files root resolution.
-- [ ] Deduplicate nested canonical roots.
-- [ ] Batch ignore checks and skip outside symlinks.
-- [ ] Share one budget across workspaces and roots.
-- [ ] Add application service tests for every scope.
+- [x] Add item-root search resolution.
+- [x] Add configured-source and all-files root resolution.
+- [x] Deduplicate nested canonical roots.
+- [x] Batch ignore checks and skip outside symlinks.
+- [x] Share one budget across workspaces and roots.
+- [x] Add application service tests for every scope.
 
 **Verification:** `rtk go test ./internal/application/contentsearch ./internal/workspacefiles`
 
