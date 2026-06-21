@@ -128,4 +128,4 @@ Explorer content search
 - Added Configured Sources and All Files Explorer modes.
 - Added item and Explorer content-search interfaces with line context and keyboard controls.
 - Verified 147 backend tests and 66 frontend tests.
-- Built production assets with a 315.89 kB main JavaScript bundle and a 70.44 kB main stylesheet.
+- Built production assets with a 316.59 kB main JavaScript bundle and a 70.36 kB main stylesheet.

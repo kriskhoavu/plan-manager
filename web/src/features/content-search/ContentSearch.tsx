@@ -1,6 +1,6 @@
 import type { KeyboardEvent, RefObject } from 'react';
 import { Search } from 'lucide-react';
-import type { WorkspaceContentSearchResult } from '../../lib/types';
+import type { WorkspaceContentSearchResult, WorkspacePathSearchResult } from '../../lib/types';
 
 const maxVisibleResults = 20;
 const maxVisibleSnippetCharacters = 120;
@@ -63,6 +63,20 @@ export function ContentSearchResultRow({ result, query, active, onActive, onOpen
 		<span className="content-search-result-header"><strong>{result.name}</strong><span className="content-search-line">L{result.lineNumber}</span></span>
 		<span className="content-search-path">{showWorkspaceContext && <>{result.workspaceName} · </>}{compactParentPath(result.path)}</span>
 		<span className="content-search-snippet">{highlightSnippet(compactSnippet(result.snippet, query), query, result.id)}</span>
+	</button>;
+}
+
+export function PathSearchResultRow({ result, query, active, onActive, onOpen }: {
+	result: WorkspacePathSearchResult;
+	query: string;
+	active: boolean;
+	onActive: () => void;
+	onOpen: () => void;
+}) {
+	const kind = result.type === 'directory' ? 'Folder' : 'File';
+	return <button type="button" role="option" aria-label={`${result.name}, ${kind.toLocaleLowerCase()}, ${result.context || 'workspace root'}`} aria-selected={active} className={`content-search-result${active ? ' active' : ''}`} title={`${result.workspaceName} · ${result.path}`} onMouseEnter={onActive} onClick={onOpen}>
+		<span className="content-search-result-header"><strong>{highlightSnippet(result.name, query, result.id)}</strong><span className="content-search-line content-search-kind">{kind}</span></span>
+		<span className="content-search-path">{result.workspaceName} · {result.context || 'Workspace root'}</span>
 	</button>;
 }
 

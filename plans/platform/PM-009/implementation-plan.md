@@ -18,6 +18,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 | F4    | Styling, Accessibility, And Final QA | ✅     |
 | F5    | Compact Search Result UX             | ✅     |
 | F6    | Unified Explorer Search              | ✅     |
+| F7    | Shared Explorer Result Cards         | ✅     |
 
 ## Backend Phases
 
@@ -242,6 +243,27 @@ PM-009: Simplify Explorer search controls
 - Remove ambiguous search controls from narrow panels
 ```
 
+### Phase F7: Shared Explorer Result Cards
+
+**Deliverables:**
+
+- [x] Render Explorer filename matches with the shared content-search card style.
+- [x] Render Explorer text matches through the same shared result component as item details.
+- [x] Use matching filename, badge, location, highlight, hover, and keyboard states.
+- [x] Preserve file/folder type context for filename matches.
+- [x] Add Explorer card-style regression coverage.
+
+**Verification:** `rtk npm run typecheck && rtk npm test -- --run`
+
+**Draft Commit:**
+```text
+PM-009: Unify Explorer search result cards
+
+- Reuse item-detail result cards in Explorer
+- Match filename and text result spacing and states
+- Preserve result type and location context
+```
+
 ## Post-Implementation Checklist
 
 - [x] Confirm item search cannot read sibling item directories.
@@ -258,6 +280,6 @@ PM-009: Simplify Explorer search controls
 
 - Backend: 147 tests passed across 26 packages.
 - Frontend: 66 tests passed across 22 files.
-- Production: main JavaScript 315.89 kB (91.68 kB gzip); main CSS 70.44 kB (12.63 kB gzip).
+- Production: main JavaScript 316.59 kB (91.78 kB gzip); main CSS 70.36 kB (12.60 kB gzip).
 - Dependencies: Go modules verified and the npm dependency tree resolved; npm audit was unavailable because the configured internal registry did not resolve.
 - Browser automation: unavailable in this session; component tests cover keyboard controls, mode switching, highlighting, and responsive state structure.

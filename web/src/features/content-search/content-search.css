@@ -93,6 +93,17 @@
   font-weight: 700;
 }
 
+.content-search-kind {
+  text-transform: uppercase;
+}
+
+.content-search-result-header strong mark {
+  border-radius: 2px;
+  background: color-mix(in srgb, #facc15 72%, var(--panel));
+  color: #422006;
+  padding: 0 1px;
+}
+
 .content-search-path {
   min-width: 0;
   overflow: hidden;
@@ -143,6 +154,11 @@
 }
 
 :root[data-theme="dark"] .content-search-snippet mark {
+  background: color-mix(in srgb, #facc15 55%, var(--panel));
+  color: #fff7cc;
+}
+
+:root[data-theme="dark"] .content-search-result-header strong mark {
   background: color-mix(in srgb, #facc15 55%, var(--panel));
   color: #fff7cc;
 }

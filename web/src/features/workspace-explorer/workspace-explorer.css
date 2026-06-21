@@ -468,26 +468,6 @@
   padding-top: 4px;
 }
 
-.explorer-unified-results > .content-search-result {
-  min-height: 0;
-  display: grid;
-  align-items: initial;
-  gap: 5px;
-  padding: 9px 8px;
-  border-radius: 6px;
-}
-
-.explorer-unified-results > .content-search-result > .content-search-result-header {
-  display: flex;
-}
-
-.explorer-unified-results > .content-search-result > .content-search-path {
-  display: block;
-}
-
-.explorer-unified-results > .content-search-result > .content-search-snippet {
-  display: -webkit-box;
-}
 
 @media (max-width: 1180px) {
   .explorer-grid {

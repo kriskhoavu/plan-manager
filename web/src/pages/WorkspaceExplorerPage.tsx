@@ -17,7 +17,7 @@ import { useWorkspacePathMutations } from '../features/workspace-explorer/useWor
 import { ApiError, api } from '../lib/api';
 import type { GitStatus, ItemSummary, WorkspaceConfig, WorkspaceHealth, WorkspacePathGitState, WorkspacePathSearchResult } from '../lib/types';
 import { parseGitDiff } from '../shared/domain/diff';
-import { ContentSearchResultRow } from '../features/content-search/ContentSearch';
+import { ContentSearchResultRow, PathSearchResultRow } from '../features/content-search/ContentSearch';
 import { useContentSearch } from '../features/content-search/useContentSearch';
 import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
 
@@ -320,13 +320,11 @@ function ExplorerUnifiedSearchResults({ query, results, loading, error, activeIn
     if (event.key === 'ArrowUp') { event.preventDefault(); onActiveIndex(Math.max(activeIndex - 1, 0)); }
     if (event.key === 'Enter') { event.preventDefault(); onOpen(results[activeIndex] ?? results[0]); }
   };
-	return <div className="explorer-search-results explorer-unified-results" role="listbox" aria-label="File search results" tabIndex={0} onKeyDown={onKeyDown}>
-		{loading && <span className="explorer-search-message">Searching...</span>}
-		{error && <span className="explorer-search-message error">{error}</span>}
-		{!loading && !error && results.length === 0 && <span className="explorer-search-message">No matching files or text.</span>}
-		{results.map((entry, index) => entry.kind === 'path' ? <button key={`path:${entry.result.id}`} role="option" aria-selected={index === activeIndex} className={index === activeIndex ? 'active' : ''} onMouseEnter={() => onActiveIndex(index)} onClick={() => onOpen(entry)}>
-		  {entry.result.type === 'directory' ? <Folder size={15} /> : <File size={15} />}<span><strong>{entry.result.name}</strong><small>{entry.result.workspaceName} · {entry.result.context || 'root'}</small></span>
-		</button> : <ContentSearchResultRow key={`content:${entry.result.id}`} result={entry.result} query={query} active={index === activeIndex} onActive={() => onActiveIndex(index)} onOpen={() => onOpen(entry)} />)}
+	return <div className="content-search-results explorer-unified-results" role="listbox" aria-label="File search results" tabIndex={0} onKeyDown={onKeyDown}>
+		<div className="content-search-live" aria-live="polite">{loading ? 'Searching files…' : `${results.length} matches`}</div>
+		{error && <p className="content-search-message error">{error}</p>}
+		{!loading && !error && results.length === 0 && <p className="content-search-message">No matching files or text.</p>}
+		{results.map((entry, index) => entry.kind === 'path' ? <PathSearchResultRow key={`path:${entry.result.id}`} result={entry.result} query={query} active={index === activeIndex} onActive={() => onActiveIndex(index)} onOpen={() => onOpen(entry)} /> : <ContentSearchResultRow key={`content:${entry.result.id}`} result={entry.result} query={query} active={index === activeIndex} onActive={() => onActiveIndex(index)} onOpen={() => onOpen(entry)} />)}
 	</div>;
 }
 

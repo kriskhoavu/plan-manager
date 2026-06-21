@@ -49,8 +49,10 @@ describe('WorkspaceExplorerPage', () => {
     apiMock.searchWorkspacePaths.mockResolvedValue({ results: [{ id: 'result', workspaceId: 'ws', workspaceName: 'Workspace', name: 'guide.md', path: 'docs/guide.md', type: 'file', ignored: false, context: 'docs' }], truncated: false });
     render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ workspaceId: 'ws' }} onLocationChange={onLocationChange} onOpenKanban={vi.fn()} />);
 		fireEvent.change(screen.getByRole('textbox', { name: 'Search files' }), { target: { value: 'guide' } });
-    expect(await screen.findByRole('option', { name: /guide.md/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('option', { name: /guide.md/i }));
+		const pathResult = await screen.findByRole('option', { name: /guide.md/i });
+		expect(pathResult).toHaveClass('content-search-result');
+		expect(pathResult).toHaveTextContent('File');
+		fireEvent.click(pathResult);
     await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', path: 'docs/guide.md' }));
   });
 
@@ -74,6 +76,7 @@ describe('WorkspaceExplorerPage', () => {
 		expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', mode: 'all' });
 		fireEvent.change(screen.getByRole('textbox', { name: 'Search files' }), { target: { value: 'needle' } });
 		const result = await screen.findByRole('option', { name: /guide.md/i });
+		expect(result).toHaveClass('content-search-result');
 		expect(result.querySelector('mark')).toHaveTextContent('needle');
 		fireEvent.click(result);
 		await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', path: 'docs/guide.md' }));
