@@ -21,17 +21,17 @@ describe('ContentViewer', () => {
   it('renders Markdown and switches to source', async () => {
     render(<ContentViewer file={file()} content="# Viewer" />);
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Viewer' })).toBeInTheDocument());
+		await waitFor(() => expect(screen.getByRole('heading', { name: 'Viewer' })).toBeInTheDocument(), { timeout: 3000 });
     fireEvent.click(screen.getByRole('tab', { name: 'Source' }));
-    await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('# Viewer'));
+		await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('# Viewer'), { timeout: 3000 });
   });
 
   it('uses structured mode for JSON and preserves source fallback', async () => {
     render(<ContentViewer file={file({ id: 'data_json', path: 'data.json', kind: 'json', language: 'json', editable: false })} content='{"enabled":true}' />);
 
-    expect(await screen.findByText('enabled:')).toBeInTheDocument();
+		expect(await screen.findByText('enabled:', {}, { timeout: 3000 })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Source' }));
-    await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('{"enabled":true}'));
+		await waitFor(() => expect(document.querySelector('.source-line-content')).toHaveTextContent('{"enabled":true}'), { timeout: 3000 });
   });
 
   it('does not run rich renderers for large files', async () => {

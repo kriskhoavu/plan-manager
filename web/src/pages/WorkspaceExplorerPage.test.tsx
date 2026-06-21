@@ -5,7 +5,7 @@ import { WorkspaceExplorerPage } from './WorkspaceExplorerPage';
 const apiMock = vi.hoisted(() => ({
   items: vi.fn(), workspaceTree: vi.fn(), workspaceFile: vi.fn(), workspaceFileDiff: vi.fn(),
   saveWorkspaceFile: vi.fn(), revertWorkspaceFile: vi.fn(), openPath: vi.fn(), gitStatus: vi.fn(), workspaceHealth: vi.fn(),
-  searchWorkspacePaths: vi.fn(), workspacePathGitStates: vi.fn(), createWorkspaceFile: vi.fn(), createWorkspaceDirectory: vi.fn(), renameWorkspacePath: vi.fn()
+	searchWorkspacePaths: vi.fn(), searchWorkspaceContent: vi.fn(), searchItemContent: vi.fn(), workspacePathGitStates: vi.fn(), createWorkspaceFile: vi.fn(), createWorkspaceDirectory: vi.fn(), renameWorkspacePath: vi.fn()
 }));
 
 vi.mock('../lib/api', () => ({
@@ -27,6 +27,7 @@ describe('WorkspaceExplorerPage', () => {
     apiMock.workspaceHealth.mockResolvedValue({ workspaceId: 'ws', checkedAt: '', summary: 'ok', checks: [] });
     apiMock.workspacePathGitStates.mockResolvedValue([]);
     apiMock.searchWorkspacePaths.mockResolvedValue({ results: [], truncated: false });
+		apiMock.searchWorkspaceContent.mockResolvedValue({ results: [], truncated: false, filesVisited: 0, bytesRead: 0, skippedFiles: 0 });
   });
 
   it('loads one directory when a workspace root expands', async () => {
@@ -61,4 +62,22 @@ describe('WorkspaceExplorerPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(apiMock.createWorkspaceFile).toHaveBeenCalledWith('ws', { parentPath: '', name: 'notes.md', content: '' }));
   });
+
+	it('switches tree mode and opens a highlighted content match', async () => {
+		const onLocationChange = vi.fn();
+		apiMock.searchWorkspaceContent.mockResolvedValue({
+			results: [{ id: 'match', workspaceId: 'ws', workspaceName: 'Workspace', path: 'docs/guide.md', name: 'guide.md', kind: 'markdown', language: 'markdown', lineNumber: 7, columnStart: 3, columnEnd: 9, snippet: 'A needle here', ignored: false }],
+			truncated: false, filesVisited: 1, bytesRead: 20, skippedFiles: 0
+		});
+		render(<WorkspaceExplorerPage workspaces={[{ ...workspace, sources: ['docs'] }]} location={{ workspaceId: 'ws' }} onLocationChange={onLocationChange} onOpenKanban={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: 'All Files' }));
+		expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', mode: 'all' });
+		fireEvent.click(screen.getByRole('tab', { name: 'Content' }));
+		fireEvent.change(screen.getByRole('textbox', { name: 'Search file contents' }), { target: { value: 'needle' } });
+		const result = await screen.findByRole('option', { name: /guide.md/i });
+		expect(result.querySelector('mark')).toHaveTextContent('needle');
+		fireEvent.click(result);
+		await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ workspaceId: 'ws', path: 'docs/guide.md' }));
+		expect(document.querySelector('.content-match-context')).toHaveTextContent('Line 7, columns 3–9');
+	});
 });

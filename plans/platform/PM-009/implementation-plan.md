@@ -14,7 +14,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 | B4    | Search Safety And Scale Tests        | ✅     |
 | F1    | Types And Content Search Clients     | ✅     |
 | F2    | Tree Mode And Search State           | ✅     |
-| F3    | Item And Explorer Search UI          |        |
+| F3    | Item And Explorer Search UI          | ✅     |
 | F4    | Styling, Accessibility, And Final QA |        |
 
 ## Backend Phases
@@ -154,13 +154,13 @@ PM-009: Add scoped content search state
 
 **Deliverables:**
 
-- [ ] Add item details content-search input and results.
-- [ ] Add Explorer tree-mode control.
-- [ ] Keep Explorer Paths and Content search distinct.
-- [ ] Add all/current workspace content-search scope.
-- [ ] Add keyboard result navigation and match highlighting.
-- [ ] Save pending Markdown before opening another result.
-- [ ] Add component and integration tests.
+- [x] Add item details content-search input and results.
+- [x] Add Explorer tree-mode control.
+- [x] Keep Explorer Paths and Content search distinct.
+- [x] Add all/current workspace content-search scope.
+- [x] Add keyboard result navigation and match highlighting.
+- [x] Save pending Markdown before opening another result.
+- [x] Add component and integration tests.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run`
 

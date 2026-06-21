@@ -31,6 +31,9 @@ import { parseGitDiff } from '../shared/domain/diff';
 import type { DiffFile, DiffLine } from '../shared/domain/diff';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
+import { ContentSearchInput, ContentSearchResults } from '../features/content-search/ContentSearch';
+import { useContentSearch } from '../features/content-search/useContentSearch';
+import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'git';
@@ -64,6 +67,10 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const [rightWidth, setRightWidth] = useState(300);
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
+	const [contentSearchIndex, setContentSearchIndex] = useState(0);
+	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
+	const fileTreeRef = useRef<HTMLDivElement | null>(null);
+	const contentSearch = useContentSearch({ kind: 'item', itemId });
 
   const showOperationError = (caught: unknown, fallback: string) => {
     setError(caught instanceof Error ? caught.message : fallback);
@@ -148,6 +155,20 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
     if (dirtyFile && !(await editor.saveNow())) return;
     await loadFile(fileId);
   };
+
+	const openTreeFile = (fileId: string) => {
+		setMatchContext(null);
+		void openFile(fileId);
+	};
+
+	const openContentResult = async (result: WorkspaceContentSearchResult) => {
+		if (!result.fileId) return;
+		if (dirtyFile && !(await editor.saveNow())) return;
+		setMatchContext({ workspaceId: result.workspaceId, itemId: result.itemId, path: result.path, fileId: result.fileId, lineNumber: result.lineNumber, columnStart: result.columnStart, columnEnd: result.columnEnd });
+		await openFile(result.fileId);
+	};
+
+	useEffect(() => { setMatchContext(null); setContentSearchIndex(0); }, [contentSearch.query]);
 
   const dirtyMetadata = Boolean(plan) && (
     (metadataDraft.title ?? '') !== (plan?.title ?? '') ||
@@ -373,8 +394,14 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
             </button>
           </div>
           {!leftCollapsed && (
-            <div className="file-tree-list">
-              {files.map((node) => <TreeNode node={node} key={node.id} onOpen={openFile} activeId={file?.id} depth={0} fileStateByPath={fileStateByPath} />)}
+			<>
+				<ContentSearchInput label="Search item contents" query={contentSearch.query} onQueryChange={contentSearch.setQuery} caseSensitive={contentSearch.caseSensitive} onCaseSensitiveChange={contentSearch.setCaseSensitive} />
+				{contentSearch.query.trim().length >= 2 && <ContentSearchResults {...contentSearch} activeIndex={contentSearchIndex} onActiveIndex={setContentSearchIndex} onOpen={(result) => void openContentResult(result)} onEscape={contentSearch.clear} treeRef={fileTreeRef} />}
+			</>
+		  )}
+		  {!leftCollapsed && (
+			<div className="file-tree-list" ref={fileTreeRef} tabIndex={-1}>
+			  {files.map((node) => <TreeNode node={node} key={node.id} onOpen={openTreeFile} activeId={file?.id} depth={0} fileStateByPath={fileStateByPath} />)}
             </div>
           )}
           {!leftCollapsed && (
@@ -392,6 +419,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
             </div>
             <span className={`autosave-state ${autoSaveState}`}>{autoSaveLabel(autoSaveState)}</span>
           </div>
+		  {matchContext && <div className="content-match-context">Line {matchContext.lineNumber}, columns {matchContext.columnStart}–{matchContext.columnEnd}</div>}
           {(dirtyMetadata || dirtyFile || autoSaveState !== 'idle') && <div className="edit-state-banner">{dirtyMetadata ? 'Unsaved metadata changes' : autoSaveLabel(autoSaveState)}</div>}
           {tab === 'preview' && (file ? <ContentViewer file={file} content={editorContent} /> : <EmptyDocumentState hasFiles={hasFiles} />)}
           {tab === 'raw' && (

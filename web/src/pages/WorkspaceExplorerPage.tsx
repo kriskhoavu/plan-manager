@@ -17,9 +17,13 @@ import { useWorkspacePathMutations } from '../features/workspace-explorer/useWor
 import { ApiError, api } from '../lib/api';
 import type { GitStatus, ItemSummary, WorkspaceConfig, WorkspaceHealth, WorkspacePathGitState, WorkspacePathSearchResult } from '../lib/types';
 import { parseGitDiff } from '../shared/domain/diff';
+import { ContentSearchInput, ContentSearchResults } from '../features/content-search/ContentSearch';
+import { useContentSearch } from '../features/content-search/useContentSearch';
+import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
 
 type EditorTab = 'preview' | 'raw' | 'diff';
 type PathDialog = { kind: 'file' | 'directory' | 'rename'; parentPath: string; currentPath?: string; initialName?: string };
+type SearchTab = 'paths' | 'content';
 
 export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, onOpenKanban }: {
   workspaces: WorkspaceConfig[];
@@ -40,10 +44,15 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
   const [searchAll, setSearchAll] = useState(!location?.workspaceId);
   const [searchIndex, setSearchIndex] = useState(0);
   const [pathDialog, setPathDialog] = useState<PathDialog | null>(null);
+	const [searchTab, setSearchTab] = useState<SearchTab>('paths');
+	const [contentSearchIndex, setContentSearchIndex] = useState(0);
+	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
+	const treeRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const workspace = workspaces.find((item) => item.id === location?.workspaceId);
   const selectedRow = explorer.rows.find((row) => explorerNodeId(row.workspaceId, row.node.path) === explorer.selection?.nodeId);
   const pathSearch = useWorkspacePathSearch({ workspaceId: searchAll || !location?.workspaceId ? undefined : location.workspaceId, includeIgnored: explorer.showIgnored });
+	const contentSearch = useContentSearch({ kind: 'explorer', mode: explorer.mode, workspaceId: searchAll || !location?.workspaceId ? undefined : location.workspaceId, includeIgnored: explorer.showIgnored });
   const mutations = useWorkspacePathMutations(async (result) => {
     await explorer.invalidateDirectories(result.workspaceId, result.invalidatedPaths);
     await explorer.expandToPath(result.workspaceId, result.path, result.type);
@@ -90,6 +99,7 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
 
   const selectRow = async (row: VisibleExplorerRow) => {
     if (editor.dirty && !(await editor.saveNow())) return;
+		setMatchContext(null);
     explorer.select(row.workspaceId, row.node.path);
   };
 
@@ -99,6 +109,14 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
     pathSearch.setQuery('');
     setSearchIndex(0);
   };
+
+	const openContentResult = async (result: WorkspaceContentSearchResult) => {
+		if (editor.dirty && !(await editor.saveNow())) return;
+		setMatchContext({ workspaceId: result.workspaceId, path: result.path, lineNumber: result.lineNumber, columnStart: result.columnStart, columnEnd: result.columnEnd });
+		await explorer.expandToPath(result.workspaceId, result.path, 'file');
+	};
+
+	useEffect(() => { setMatchContext(null); setContentSearchIndex(0); }, [contentSearch.query]);
 
   const selectedParentPath = () => {
     if (!selectedRow || selectedRow.node.type === 'workspace') return '';
@@ -206,6 +224,15 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
       </header>
       <div className="explorer-grid" style={gridStyle} ref={gridRef}>
         <aside className="explorer-tree-panel">
+		  <div className="explorer-mode-control" role="group" aria-label="Explorer tree mode">
+			<button type="button" className={explorer.mode === 'sources' ? 'active' : ''} onClick={() => explorer.setMode('sources')}>Configured Sources</button>
+			<button type="button" className={explorer.mode === 'all' ? 'active' : ''} onClick={() => explorer.setMode('all')}>All Files</button>
+		  </div>
+		  <div className="explorer-search-tabs" role="tablist" aria-label="Explorer search type">
+			<button role="tab" aria-selected={searchTab === 'paths'} className={searchTab === 'paths' ? 'active' : ''} onClick={() => setSearchTab('paths')}>Paths</button>
+			<button role="tab" aria-selected={searchTab === 'content'} className={searchTab === 'content' ? 'active' : ''} onClick={() => setSearchTab('content')}>Content</button>
+		  </div>
+		  {searchTab === 'paths' ? <>
           <div className="explorer-toolbar">
             <label><Search size={15} /><input aria-label="Search workspace paths" value={pathSearch.query} onChange={(event) => { pathSearch.setQuery(event.target.value); setSearchIndex(0); }} onKeyDown={(event) => {
               if (event.key === 'ArrowDown' && pathSearch.results.length) { event.preventDefault(); setSearchIndex((index) => Math.min(index + 1, pathSearch.results.length - 1)); }
@@ -219,11 +246,21 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
             <button className={explorer.showIgnored ? 'icon-button active' : 'icon-button'} type="button" title="Show ignored files" onClick={() => explorer.setShowIgnored(!explorer.showIgnored)}><Settings2 size={16} /></button>
           </div>
           {pathSearch.query.trim() && <ExplorerSearchResults {...pathSearch} activeIndex={searchIndex} onActiveIndex={setSearchIndex} onOpen={(result) => void openSearchResult(result)} />}
-          <div className="explorer-tree" role="tree" aria-label="Workspace files" tabIndex={0} onKeyDown={onTreeKeyDown}>
+		  </> : <>
+			<div className="explorer-toolbar content-toolbar">
+			  <ContentSearchInput label="Search file contents" query={contentSearch.query} onQueryChange={contentSearch.setQuery} caseSensitive={contentSearch.caseSensitive} onCaseSensitiveChange={contentSearch.setCaseSensitive} />
+			  <select aria-label="Content search scope" value={searchAll || !location?.workspaceId ? 'all' : 'current'} onChange={(event) => setSearchAll(event.target.value === 'all')}>
+				<option value="current" disabled={!location?.workspaceId}>Current</option><option value="all">All</option>
+			  </select>
+			</div>
+			{contentSearch.query.trim().length >= 2 && <ContentSearchResults {...contentSearch} activeIndex={contentSearchIndex} onActiveIndex={setContentSearchIndex} onOpen={(result) => void openContentResult(result)} onEscape={contentSearch.clear} treeRef={treeRef} />}
+		  </>}
+		  <div className="explorer-tree" ref={treeRef} role="tree" aria-label="Workspace files" tabIndex={0} onKeyDown={onTreeKeyDown}>
             {explorer.rows.map((row, index) => (
               <ExplorerTreeRow key={explorerNodeId(row.workspaceId, row.node.path)} row={row} gitState={explorer.gitStateByPath.get(explorerNodeId(row.workspaceId, row.node.path))} active={index === explorer.activeIndex} selected={explorer.selection?.nodeId === explorerNodeId(row.workspaceId, row.node.path)} expanded={explorer.expandedNodeIds.has(explorerNodeId(row.workspaceId, row.node.path))} onFocus={() => explorer.setActiveIndex(index)} onSelect={() => void selectRow(row)} onToggle={() => toggleRow(row)} />
             ))}
             {explorer.rows.length === 0 && <p className="explorer-empty">No matching paths.</p>}
+			{explorer.mode === 'sources' && workspaces.every((item) => item.sources.length === 0) && <button className="secondary" type="button" onClick={() => explorer.setMode('all')}>Browse All Files</button>}
           </div>
           <button className="explorer-resize-handle left" aria-label="Resize workspace tree" onPointerDown={(event) => startResize('left', event)} />
         </aside>
@@ -244,6 +281,7 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
             </div>
             <span className={`autosave-state ${editor.state}`}>{autoSaveLabel(editor.state)}</span>
           </div>
+		  {matchContext && <div className="content-match-context">Line {matchContext.lineNumber}, columns {matchContext.columnStart}–{matchContext.columnEnd}</div>}
           {error && <div className="operation-error"><p className="error">{error}</p>{recoveryHint && <p>{recoveryHint}</p>}<button className="secondary" onClick={() => void loadFile()}>Reload file</button></div>}
           {tab === 'preview' && (editor.file ? <ContentViewer file={editor.file} content={editor.content} /> : <ExplorerEmpty row={selectedRow} />)}
           {tab === 'raw' && <textarea className="raw-editor" value={editor.file ? editor.content : 'Select a file.'} disabled={!editor.file?.editable} onChange={(event) => editor.setContent(event.target.value)} spellCheck={false} />}
