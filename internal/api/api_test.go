@@ -374,6 +374,67 @@ func TestWorkspaceProductivityRoutes(t *testing.T) {
 	}
 }
 
+func TestContentSearchRoutesAndValidation(t *testing.T) {
+	apiHandler, workspace, idx, _ := reliabilityTestAPI(t)
+	itemPath := "plans/platform/PM-009"
+	if err := os.MkdirAll(filepath.Join(workspace.Path, filepath.FromSlash(itemPath)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace.Path, filepath.FromSlash(itemPath), "README.md"), []byte("Scoped needle here\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace.Path, "root.txt"), []byte("Root needle here\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{ID: "item-search", WorkspaceID: workspace.ID, WorkspaceName: workspace.Name, ItemPath: itemPath}}
+	if err := idx.ReplaceWorkspace(workspace.ID, []models.ItemDetail{item}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+
+	request := func(path string) *httptest.ResponseRecorder {
+		response := httptest.NewRecorder()
+		apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		return response
+	}
+	itemResponse := request("/api/items/item-search/content-search?q=needle")
+	var itemResult models.WorkspaceContentSearchResponse
+	if err := json.Unmarshal(itemResponse.Body.Bytes(), &itemResult); err != nil || itemResponse.Code != http.StatusOK || len(itemResult.Results) != 1 || itemResult.Results[0].ItemID != "item-search" {
+		t.Fatalf("item status=%d result=%#v err=%v", itemResponse.Code, itemResult, err)
+	}
+	sourcesResponse := request("/api/workspaces/files/content-search?q=needle&mode=sources&workspaceId=" + workspace.ID)
+	var sourcesResult models.WorkspaceContentSearchResponse
+	if err := json.Unmarshal(sourcesResponse.Body.Bytes(), &sourcesResult); err != nil || sourcesResponse.Code != http.StatusOK || len(sourcesResult.Results) != 1 {
+		t.Fatalf("sources status=%d result=%#v err=%v", sourcesResponse.Code, sourcesResult, err)
+	}
+	allResponse := request("/api/workspaces/files/content-search?q=needle&mode=all&workspaceId=" + workspace.ID + "&caseSensitive=false")
+	var allResult models.WorkspaceContentSearchResponse
+	if err := json.Unmarshal(allResponse.Body.Bytes(), &allResult); err != nil || allResponse.Code != http.StatusOK || len(allResult.Results) != 2 {
+		t.Fatalf("all status=%d result=%#v err=%v", allResponse.Code, allResult, err)
+	}
+	for _, path := range []string{
+		"/api/items/missing/content-search?q=needle",
+		"/api/workspaces/files/content-search?q=needle&workspaceId=missing",
+	} {
+		if response := request(path); response.Code != http.StatusNotFound {
+			t.Fatalf("%s status=%d body=%s", path, response.Code, response.Body.String())
+		}
+	}
+	for _, path := range []string{
+		"/api/workspaces/files/content-search?q=x",
+		"/api/workspaces/files/content-search?q=needle&mode=invalid",
+		"/api/workspaces/files/content-search?q=needle&caseSensitive=perhaps",
+	} {
+		if response := request(path); response.Code != http.StatusBadRequest {
+			t.Fatalf("%s status=%d body=%s", path, response.Code, response.Body.String())
+		}
+	}
+
+	pathSearch := request("/api/workspaces/files/search?q=README&workspaceId=" + workspace.ID)
+	if pathSearch.Code != http.StatusOK {
+		t.Fatalf("path search regression status=%d body=%s", pathSearch.Code, pathSearch.Body.String())
+	}
+}
+
 func TestGitPullDirtyTreeReturnsRecoveryHint(t *testing.T) {
 	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
 	if err := os.WriteFile(filepath.Join(workspace.Path, "plans", "dirty.md"), []byte("dirty"), 0o644); err != nil {

@@ -10,7 +10,7 @@ Add bounded content search to item details and Explorer. Make configured workspa
 |-------|--------------------------------------|--------|
 | B1    | Content Search Domain And Budgets    | ✅     |
 | B2    | Scope Resolution And Application     | ✅     |
-| B3    | Item And Explorer Search APIs        |        |
+| B3    | Item And Explorer Search APIs        | ✅     |
 | B4    | Search Safety And Scale Tests        |        |
 | F1    | Types And Content Search Clients     |        |
 | F2    | Tree Mode And Search State           |        |
@@ -67,12 +67,12 @@ PM-009: Add scoped content search service
 
 **Deliverables:**
 
-- [ ] Add item content-search endpoint.
-- [ ] Add Explorer content-search endpoint.
-- [ ] Validate query, mode, workspace, and case options.
-- [ ] Map item, workspace, safety, and cancellation errors.
-- [ ] Preserve PM-005 and PM-008 search contracts.
-- [ ] Add API regression tests.
+- [x] Add item content-search endpoint.
+- [x] Add Explorer content-search endpoint.
+- [x] Validate query, mode, workspace, and case options.
+- [x] Map item, workspace, safety, and cancellation errors.
+- [x] Preserve PM-005 and PM-008 search contracts.
+- [x] Add API regression tests.
 
 **Verification:** `rtk go test ./internal/api ./internal/app`
 

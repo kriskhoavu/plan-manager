@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"plan-manager/internal/application/apperrors"
+	appcontentsearch "plan-manager/internal/application/contentsearch"
 	appgit "plan-manager/internal/application/git"
 	apphealth "plan-manager/internal/application/health"
 	appitem "plan-manager/internal/application/item"
@@ -41,6 +43,7 @@ type API struct {
 	search         *appsearch.Service
 	navigation     *navigation.Store
 	workspaceFiles *appworkspacefiles.Service
+	contentSearch  *appcontentsearch.Service
 }
 
 func New(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *gitadapter.GitAdapter, dialog *systemdialog.Dialog) *API {
@@ -56,6 +59,7 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 	if writer != nil {
 		refresher = writer
 	}
+	workspaceFileAccess := workspaceaccess.New()
 	return &API{
 		workspaces:     appworkspace.New(reg, idx, scan, writer),
 		items:          appitem.New(reg, idx, files, writer, git),
@@ -65,7 +69,8 @@ func NewWithServices(reg *registry.Registry, idx *itemindex.Index, scan *scanner
 		healthService:  healthService,
 		search:         searchService,
 		navigation:     navigationStore,
-		workspaceFiles: appworkspacefiles.New(reg, workspaceaccess.New(), git, auditStore, refresher),
+		workspaceFiles: appworkspacefiles.New(reg, workspaceFileAccess, git, auditStore, refresher),
+		contentSearch:  appcontentsearch.New(reg, idx, workspaceFileAccess),
 	}
 }
 
@@ -90,6 +95,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("PUT /api/workspaces/{id}/source-structure", a.saveSourceStructure)
 	mux.HandleFunc("GET /api/workspaces/{id}/tree", a.workspaceTree)
 	mux.HandleFunc("GET /api/workspaces/files/search", a.workspacePathSearch)
+	mux.HandleFunc("GET /api/workspaces/files/content-search", a.workspaceContentSearch)
 	mux.HandleFunc("GET /api/workspaces/{id}/files", a.workspaceFile)
 	mux.HandleFunc("PUT /api/workspaces/{id}/files", a.saveWorkspaceFile)
 	mux.HandleFunc("POST /api/workspaces/{id}/files", a.createWorkspaceFile)
@@ -101,6 +107,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/items", a.listItems)
 	mux.HandleFunc("GET /api/items/{id}", a.itemDetail)
 	mux.HandleFunc("GET /api/items/{id}/files", a.itemFiles)
+	mux.HandleFunc("GET /api/items/{id}/content-search", a.itemContentSearch)
 	mux.HandleFunc("GET /api/items/{id}/files/{fileID}", a.itemFileContent)
 	mux.HandleFunc("POST /api/items/{id}/files/{fileID}", a.saveItemFile)
 	mux.HandleFunc("POST /api/items/{id}/files/{fileID}/revert", a.revertItemFile)
@@ -371,6 +378,23 @@ func (a *API) workspacePathSearch(w http.ResponseWriter, r *http.Request) {
 	respondWorkspaceFileResult(w, result, err)
 }
 
+func (a *API) workspaceContentSearch(w http.ResponseWriter, r *http.Request) {
+	includeIgnored, err := optionalBool(r, "includeIgnored")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	caseSensitive, err := optionalBool(r, "caseSensitive")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	result, err := a.contentSearch.SearchExplorer(r.Context(), r.URL.Query().Get("mode"), r.URL.Query().Get("workspaceId"), models.WorkspaceContentSearchRequest{
+		Query: r.URL.Query().Get("q"), IncludeIgnored: includeIgnored, CaseSensitive: caseSensitive,
+	})
+	respondContentSearch(w, result, err)
+}
+
 func (a *API) workspaceFile(w http.ResponseWriter, r *http.Request) {
 	result, err := a.workspaceFiles.Read(r.PathValue("id"), r.URL.Query().Get("path"))
 	respondWorkspaceFileResult(w, result, err)
@@ -467,6 +491,18 @@ func (a *API) itemFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond(w, tree, err)
+}
+
+func (a *API) itemContentSearch(w http.ResponseWriter, r *http.Request) {
+	caseSensitive, err := optionalBool(r, "caseSensitive")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	result, err := a.contentSearch.SearchItem(r.Context(), r.PathValue("id"), models.WorkspaceContentSearchRequest{
+		Query: r.URL.Query().Get("q"), CaseSensitive: caseSensitive,
+	})
+	respondContentSearch(w, result, err)
 }
 
 func (a *API) itemFileContent(w http.ResponseWriter, r *http.Request) {
@@ -747,6 +783,31 @@ func respondWorkspaceFileResult(w http.ResponseWriter, data any, err error) {
 	default:
 		writeError(w, http.StatusBadRequest, err.Error())
 	}
+}
+
+func respondContentSearch(w http.ResponseWriter, data any, err error) {
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, data)
+	case errors.Is(err, apperrors.ErrItemNotFound), errors.Is(err, apperrors.ErrWorkspaceNotFound), errors.Is(err, os.ErrNotExist):
+		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, context.Canceled):
+		writeError(w, 499, "content search canceled")
+	default:
+		writeError(w, http.StatusBadRequest, err.Error())
+	}
+}
+
+func optionalBool(r *http.Request, name string) (bool, error) {
+	raw := r.URL.Query().Get(name)
+	if raw == "" {
+		return false, nil
+	}
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("%s must be true or false", name)
+	}
+	return value, nil
 }
 
 func respondGitResult(w http.ResponseWriter, result models.GitOperationResult) {
