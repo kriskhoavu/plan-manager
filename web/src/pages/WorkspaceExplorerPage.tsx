@@ -8,6 +8,7 @@ import type { ExplorerLocation } from '../app/router';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
+import { FileStateIcon } from '../features/file-tree/FileStateIcon';
 import { treeKeyboardAction } from '../features/workspace-explorer/keyboard';
 import { explorerNodeId } from '../features/workspace-explorer/tree';
 import type { VisibleExplorerRow } from '../features/workspace-explorer/types';
@@ -328,10 +329,9 @@ function ExplorerTreeRow({ row, gitState, branchState, active, selected, expande
   return <div className={`explorer-tree-row${selected ? ' selected' : ''}${active ? ' active' : ''}`} role="treeitem" aria-level={row.level + 1} aria-expanded={expandable ? expanded : undefined} aria-selected={selected} style={{ '--explorer-depth': row.level } as CSSProperties} onMouseEnter={onFocus}>
     <button className="explorer-row-toggle" type="button" tabIndex={-1} onClick={onToggle} disabled={!expandable}>{expandable ? (expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</button>
     <button className="explorer-row-main" type="button" tabIndex={active ? 0 : -1} onFocus={onFocus} onClick={row.node.type === 'directory' ? onToggle : onSelect}>
-      {row.node.type === 'workspace' ? <FolderGit2 size={16} /> : row.node.type === 'directory' ? <Folder size={16} /> : <File size={16} />}
-      <span><strong>{row.node.name}</strong>{row.item && <small>{row.item.identifier} · {row.item.title}</small>}</span>
-      {row.item && <i className={`item-status-dot ${row.item.status}`} title={row.item.status} />}
-      {gitState && <span className={`explorer-git-state ${gitState.status}`} aria-label={`Git status: ${gitState.status}`}>{gitState.conflict ? '!' : gitState.status.slice(0, 1).toUpperCase()}</span>}
+      {row.node.type === 'workspace' ? <FolderGit2 className="explorer-node-icon" size={16} /> : row.node.type === 'directory' ? <Folder className="explorer-node-icon" size={16} /> : <File className="explorer-node-icon" size={16} />}
+      <span className={`explorer-row-label ${row.node.type}`}>{row.node.name}</span>
+      {row.node.type === 'file' && gitState && <FileStateIcon state={gitState.conflict ? 'conflicted' : gitState.status} />}
     </button>
     {workspace && <WorkspaceBranchSelector workspace={workspace} state={branchState} onChange={(branch) => onBranchChange(workspace, branch)} />}
   </div>;

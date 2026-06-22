@@ -57,19 +57,25 @@ describe('WorkspaceExplorerPage', () => {
   });
 
   it('toggles folders from their names without folder-level Git badges', async () => {
+    apiMock.items.mockResolvedValue([{ id: 'item', workspaceId: 'ws', itemPath: 'docs', identifier: 'DI-170', title: 'Hidden Explorer description', status: 'active', branch: 'main', scope: 'api', tags: [], metadataSource: 'plan.yaml' }]);
     apiMock.workspaceTree.mockImplementation((_workspaceId: string, path: string) => Promise.resolve({
       workspaceId: 'ws', path, hiddenCount: 0, entries: path === ''
         ? [{ id: 'docs', name: 'docs', path: 'docs', type: 'directory', hasChildren: true, ignored: false, hidden: false, editable: false }]
         : [{ id: 'guide', name: 'guide.md', path: 'docs/guide.md', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' }]
     }));
-    apiMock.workspacePathGitStates.mockResolvedValue([{ path: 'docs/guide.md', status: 'untracked', conflict: false }]);
+    apiMock.workspacePathGitStates.mockResolvedValue([{ path: 'docs/guide.md', status: 'modified', conflict: false }]);
     const { container } = render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ mode: 'all' }} onLocationChange={vi.fn()} onOpenKanban={vi.fn()} />);
     fireEvent.click(container.querySelector('.explorer-row-toggle') as HTMLButtonElement);
     const folderButton = await screen.findByRole('button', { name: 'docs' });
-    expect(folderButton.closest('.explorer-tree-row')?.querySelector('.explorer-git-state')).toBeNull();
+    expect(folderButton.querySelector('.explorer-row-label')).toHaveClass('directory');
+    expect(folderButton.closest('.explorer-tree-row')?.querySelector('.tree-state-icon')).toBeNull();
+    expect(folderButton).not.toHaveTextContent('DI-170');
+    expect(folderButton.closest('.explorer-tree-row')?.querySelector('.item-status-dot')).toBeNull();
     fireEvent.click(folderButton);
     await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false));
     expect(await screen.findByText('guide.md')).toBeInTheDocument();
+    expect(screen.getByText('guide.md')).toHaveClass('explorer-row-label', 'file');
+    expect(screen.getByLabelText('Modified file not committed')).toHaveClass('tree-state-icon', 'modified');
     fireEvent.click(folderButton);
     expect(folderButton.closest('[role="treeitem"]')).toHaveAttribute('aria-expanded', 'false');
   });

@@ -267,60 +267,39 @@
 .explorer-row-main > span {
   flex: 1;
   min-width: 0;
-  display: grid;
 }
 
-.explorer-row-main strong,
-.explorer-row-main small {
+.explorer-row-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.explorer-row-main strong {
   font-size: 13px;
 }
 
-.explorer-row-main small {
+.explorer-row-label.workspace {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.explorer-row-label.directory {
   color: var(--muted);
-  font-size: 11px;
+  font-weight: 650;
 }
 
-.item-status-dot {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--muted);
+.explorer-row-label.file {
+  color: var(--text);
+  font-weight: 400;
 }
 
-.item-status-dot.in_progress { background: var(--blue); }
-.item-status-dot.review { background: var(--orange); }
-.item-status-dot.done { background: var(--green); }
-.item-status-dot.ideas { background: var(--purple); }
-
-.explorer-git-state {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  display: grid !important;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: var(--panel);
+.explorer-node-icon {
+  flex: none;
   color: var(--muted);
-  font-size: 10px;
-  font-style: normal;
-  font-weight: 800;
 }
 
-.explorer-git-state.modified { color: var(--orange); }
-.explorer-git-state.added,
-.explorer-git-state.untracked { color: var(--green); }
-.explorer-git-state.deleted,
-.explorer-git-state.conflicted { color: #dc2626; border-color: color-mix(in srgb, #dc2626 45%, var(--line)); }
-.explorer-git-state.renamed,
-.explorer-git-state.copied { color: var(--purple); }
+.explorer-tree-row.selected .explorer-row-label.file,
+.explorer-tree-row.selected .explorer-node-icon {
+  color: var(--blue);
+}
 
 .dialog-backdrop {
   position: fixed;

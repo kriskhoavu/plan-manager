@@ -6,14 +6,11 @@ import {
   Code2,
   File as FileIcon,
   FileText,
-  FilePlus2,
   FolderOpen,
   GitBranch,
   GitCompare,
   GripVertical,
   Info,
-  PencilLine,
-  TriangleAlert,
   RotateCcw,
   PanelLeftClose,
   PanelLeftOpen,
@@ -25,12 +22,14 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels } from '../lib/api';
-import type { FileContent, FileNode, GitChange, GitChangeStatus, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../lib/types';
+import type { FileContent, FileNode, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../lib/types';
 import { labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import type { DiffFile, DiffLine } from '../shared/domain/diff';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
+import { FileStateIcon } from '../features/file-tree/FileStateIcon';
+import type { TreeFileState } from '../features/file-tree/FileStateIcon';
 import { ContentSearchInput, ContentSearchResults } from '../features/content-search/ContentSearch';
 import { useContentSearch } from '../features/content-search/useContentSearch';
 import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
@@ -39,7 +38,6 @@ type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'git';
 type DiffMode = 'review' | 'raw';
 type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
-type TreeFileState = GitChangeStatus | 'unsaved';
 
 export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged }: { itemId: string; refreshKey: number; onBack: () => void; onContentChanged?: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<ItemDetail | null>(null);
@@ -698,17 +696,6 @@ const TreeNode = memo(function TreeNode({ node, onOpen, activeId, depth, fileSta
   );
 });
 
-function FileStateIcon({ state }: { state: TreeFileState }) {
-  const label = treeFileStateLabel(state);
-  if (state === 'added' || state === 'untracked') {
-    return <FilePlus2 className={`tree-state-icon ${state}`} size={14} aria-label={label} />;
-  }
-  if (state === 'conflicted') {
-    return <TriangleAlert className={`tree-state-icon ${state}`} size={14} aria-label={label} />;
-  }
-  return <PencilLine className={`tree-state-icon ${state}`} size={14} aria-label={label} />;
-}
-
 function firstFile(nodes: FileNode[]): FileNode | null {
   for (const node of nodes) {
     if (node.type === 'file') return node;
@@ -755,25 +742,4 @@ function stripItemPath(path: string, itemPath: string): string {
 
 function normalizePath(path: string): string {
   return path.replace(/^\/+/, '').replace(/\/+$/, '');
-}
-
-function treeFileStateLabel(state: TreeFileState): string {
-  switch (state) {
-    case 'added':
-    case 'untracked':
-      return 'New file not committed';
-    case 'unsaved':
-      return 'Unsaved editor changes';
-    case 'conflicted':
-      return 'File has conflicts';
-    case 'deleted':
-      return 'Deleted file';
-    case 'renamed':
-      return 'Renamed file';
-    case 'copied':
-      return 'Copied file';
-    case 'modified':
-    default:
-      return 'Modified file not committed';
-  }
 }
