@@ -198,7 +198,7 @@ Examples:
 
 Registered workspaces are not used for app registry or cache storage. Plan Manager writes to them only when the user edits Markdown, changes metadata or status, creates an item, saves source structure settings, commits, pulls, pushes, or runs a branch operation.
 
-Sources may also contain an optional `workspace-settings.yaml`. This file is owned by the workspace and describes how a non-standard source root should be split into item cards. The conceptual fields are `scope` and `identifier`; the legacy `repository-settings.yaml`, `service`, `ticket`, `plan.yaml`, and `planDirectories` are read for migration compatibility:
+Each structured plan uses `plan.yaml` as its metadata source. Sources may also contain an optional `workspace-settings.yaml`. This file is owned by the workspace and describes how a non-standard source root should be split into item cards. The conceptual fields are `scope` and `identifier`; the legacy `repository-settings.yaml`, `service`, `ticket`, and `planDirectories` names are read for migration compatibility:
 
 ```yaml
 version: 1
@@ -221,7 +221,7 @@ If the settings file is missing or invalid, the scanner falls back to the existi
 - Registry and cache writes go to the app config directory.
 - File reads and writes are restricted to configured sources.
 - Markdown writes use expected content hashes to detect stale edits.
-- Metadata writes are limited to structured items and configured source cards. A configured source card without `item.yaml` gets one when metadata is saved.
+- Metadata writes are limited to structured items and configured source cards. A configured source card without `plan.yaml` gets one when metadata is saved.
 - Commit operations stage only selected paths inside configured sources.
 - Pull and branch switch block dirty working trees unless the request confirms the risk.
 - No credentials are stored.

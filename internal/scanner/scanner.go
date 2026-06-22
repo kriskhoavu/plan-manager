@@ -169,7 +169,7 @@ func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, 
 				continue
 			}
 			warnings = append(warnings, itemWarnings...)
-			if detail.MetadataSource != "item.yaml" {
+			if detail.MetadataSource != "plan.yaml" {
 				applySourceStructureSettings(&detail, card, match.captures)
 			}
 			items = append(items, detail)
@@ -204,9 +204,6 @@ func hasStructuredItemChildren(root string, entries []fs.DirEntry) bool {
 }
 
 func isItemFolder(path, name string) bool {
-	if _, err := os.Stat(filepath.Join(path, "item.yaml")); err == nil {
-		return true
-	}
 	if _, err := os.Stat(filepath.Join(path, "plan.yaml")); err == nil {
 		return true
 	}
@@ -223,25 +220,25 @@ func (s *Scanner) parseItem(workspace models.WorkspaceConfig, branch, scope, ide
 	documents := []models.ItemDocument{}
 	metadata := map[string]any{}
 
-	if data, source, err := readItemYAML(itemRoot); err == nil {
-		parsed := parseItemYAML(string(data))
+	if data, source, err := readPlanYAML(itemRoot); err == nil {
+		parsed := parsePlanYAML(string(data))
 		metaSource = source
-		if parsed.Item.Identifier != "" {
-			identifier = parsed.Item.Identifier
+		if parsed.Plan.Identifier != "" {
+			identifier = parsed.Plan.Identifier
 		}
-		if parsed.Item.Scope != "" {
-			scope = parsed.Item.Scope
+		if parsed.Plan.Scope != "" {
+			scope = parsed.Plan.Scope
 		}
-		if parsed.Item.Title != "" {
-			title = parsed.Item.Title
+		if parsed.Plan.Title != "" {
+			title = parsed.Plan.Title
 		}
-		owner = parsed.Item.Owner
-		status = NormalizeStatus(parsed.Item.Status)
-		if parsed.Item.Tags != nil {
-			tags = parsed.Item.Tags
+		owner = parsed.Plan.Owner
+		status = NormalizeStatus(parsed.Plan.Status)
+		if parsed.Plan.Tags != nil {
+			tags = parsed.Plan.Tags
 		}
 		documents = normalizeDocuments(parsed.Documents)
-		metadata["item"] = parsed.Item
+		metadata["plan"] = parsed.Plan
 	} else if !errors.Is(err, os.ErrNotExist) {
 		warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: err.Error()})
 	}

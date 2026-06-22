@@ -82,7 +82,7 @@ The target keeps the same API routes and response payloads. The main change is r
 | `internal/security/pathguard`    | Safe joins, symlink checks, selected path validation, source scope checks      |
 | `internal/scanner`               | Public scanner facade                                                          |
 | `internal/scanner/source`        | Source traversal and source settings matching                                  |
-| `internal/scanner/metadata`      | `item.yaml` parsing, fallback Markdown parsing, legacy compatibility           |
+| `internal/scanner/metadata`      | `plan.yaml` parsing and fallback Markdown parsing                              |
 | `internal/storage/registry`      | Workspace YAML persistence                                                     |
 | `internal/storage/itemindex`     | Derived item index persistence and query                                       |
 | `internal/files`                 | File tree, file reads, Markdown writes, content hashes                         |

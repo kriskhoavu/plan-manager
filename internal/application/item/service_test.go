@@ -45,7 +45,7 @@ func TestDetailNormalizesCollectionsAndReadsFullReadmeDescription(t *testing.T) 
 			Identifier:     "PM-003",
 			Title:          "Architecture",
 			Status:         models.StatusDraft,
-			MetadataSource: "item.yaml",
+			MetadataSource: "plan.yaml",
 			ItemPath:       "plans/platform/PM-003",
 		},
 	}}, nil, createdAt); err != nil {

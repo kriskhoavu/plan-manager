@@ -123,7 +123,7 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 		}
 	}
 	meta := planYAML{
-		Item: planFields{
+		Plan: planFields{
 			Identifier: input.Identifier,
 			Title:      title,
 			Scope:      input.Scope,
@@ -181,9 +181,8 @@ func (w *Writer) refreshWorkspaceData(workspace models.WorkspaceConfig) (models.
 }
 
 type planYAML struct {
-	Item       planFields            `yaml:"item"`
-	LegacyItem *planFields           `yaml:"plan,omitempty"`
-	Documents  []models.ItemDocument `yaml:"documents,omitempty"`
+	Plan      planFields            `yaml:"plan"`
+	Documents []models.ItemDocument `yaml:"documents,omitempty"`
 }
 
 type planFields struct {
@@ -201,13 +200,10 @@ func readPlanMetadata(workspace models.WorkspaceConfig, item models.ItemDetail) 
 		return planYAML{}, err
 	}
 	var meta planYAML
-	data, err := os.ReadFile(filepath.Join(root, "item.yaml"))
+	data, err := os.ReadFile(filepath.Join(root, "plan.yaml"))
 	if os.IsNotExist(err) {
-		data, err = os.ReadFile(filepath.Join(root, "plan.yaml"))
-		if os.IsNotExist(err) {
-			meta.Documents = item.Documents
-			return meta, nil
-		}
+		meta.Documents = item.Documents
+		return meta, nil
 	}
 	if err != nil {
 		return meta, err
@@ -215,43 +211,39 @@ func readPlanMetadata(workspace models.WorkspaceConfig, item models.ItemDetail) 
 	if err := yaml.Unmarshal(data, &meta); err != nil {
 		return meta, err
 	}
-	if meta.Item.Identifier == "" && meta.LegacyItem != nil && meta.LegacyItem.Identifier != "" {
-		meta.Item = *meta.LegacyItem
-	}
-	meta.LegacyItem = nil
 	return meta, nil
 }
 
 func applyMetadata(meta *planYAML, item models.ItemDetail, input models.ItemMetadataUpdateInput) {
-	if meta.Item.Identifier == "" {
-		meta.Item.Identifier = item.Identifier
+	if meta.Plan.Identifier == "" {
+		meta.Plan.Identifier = item.Identifier
 	}
-	if meta.Item.Title == "" {
-		meta.Item.Title = item.Title
+	if meta.Plan.Title == "" {
+		meta.Plan.Title = item.Title
 	}
-	if meta.Item.Scope == "" {
-		meta.Item.Scope = item.Scope
+	if meta.Plan.Scope == "" {
+		meta.Plan.Scope = item.Scope
 	}
-	if meta.Item.Status == "" {
-		meta.Item.Status = string(item.Status)
+	if meta.Plan.Status == "" {
+		meta.Plan.Status = string(item.Status)
 	}
 	if input.Identifier != "" {
-		meta.Item.Identifier = strings.TrimSpace(input.Identifier)
+		meta.Plan.Identifier = strings.TrimSpace(input.Identifier)
 	}
 	if input.Title != "" {
-		meta.Item.Title = strings.TrimSpace(input.Title)
+		meta.Plan.Title = strings.TrimSpace(input.Title)
 	}
 	if input.Scope != "" {
-		meta.Item.Scope = strings.TrimSpace(input.Scope)
+		meta.Plan.Scope = strings.TrimSpace(input.Scope)
 	}
 	if input.Status != "" {
-		meta.Item.Status = string(input.Status)
+		meta.Plan.Status = string(input.Status)
 	}
 	if input.Owner != "" {
-		meta.Item.Owner = strings.TrimSpace(input.Owner)
+		meta.Plan.Owner = strings.TrimSpace(input.Owner)
 	}
 	if input.Tags != nil {
-		meta.Item.Tags = cleanTags(input.Tags)
+		meta.Plan.Tags = cleanTags(input.Tags)
 	}
 	if len(meta.Documents) == 0 {
 		meta.Documents = item.Documents
@@ -271,7 +263,7 @@ func writePlanMetadataAt(root string, meta planYAML) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(root, "item.yaml"), data, 0o644)
+	return os.WriteFile(filepath.Join(root, "plan.yaml"), data, 0o644)
 }
 
 func starterDocuments() []models.ItemDocument {

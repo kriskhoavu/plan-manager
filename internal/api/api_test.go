@@ -102,7 +102,7 @@ func TestRoutesListItemsPreservesJSONShape(t *testing.T) {
 			Status:         models.StatusDraft,
 			UpdatedAt:      updatedAt,
 			Description:    "Refactor architecture",
-			MetadataSource: "item.yaml",
+			MetadataSource: "plan.yaml",
 			ItemPath:       "plans/platform/PM-003",
 		},
 	}}, nil, updatedAt); err != nil {
@@ -124,7 +124,7 @@ func TestRoutesListItemsPreservesJSONShape(t *testing.T) {
 		t.Fatalf("expected one item, got %d", len(items))
 	}
 	item := items[0]
-	if item.ID != "item-1" || item.Identifier != "PM-003" || item.Status != models.StatusDraft || item.MetadataSource != "item.yaml" {
+	if item.ID != "item-1" || item.Identifier != "PM-003" || item.Status != models.StatusDraft || item.MetadataSource != "plan.yaml" {
 		t.Fatalf("unexpected item response: %+v", item)
 	}
 	if item.Tags == nil {

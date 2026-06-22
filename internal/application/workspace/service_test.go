@@ -39,7 +39,7 @@ func TestStateReflectsWorkspaceAndItemChanges(t *testing.T) {
 			Title:          "Architecture",
 			Status:         models.StatusDraft,
 			UpdatedAt:      updatedAt,
-			MetadataSource: "item.yaml",
+			MetadataSource: "plan.yaml",
 		},
 	}}, nil, updatedAt); err != nil {
 		t.Fatal(err)

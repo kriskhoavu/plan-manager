@@ -22,7 +22,7 @@ Refactor Plan Manager architecture in small behavior-preserving phases. Each pha
 **Deliverables:**
 
 - [x] Add backend characterization tests for key API response shapes and error statuses.
-- [x] Add scanner fixture tests for structured sources, configured sources, freestyle docs, and item YAML precedence.
+- [x] Add scanner fixture tests for structured sources, configured sources, freestyle docs, and plan YAML precedence.
 - [x] Add frontend helper tests for route parsing, filters, diff parsing, source parsing, and source settings inference.
 - [x] Record current build, test, and bundle baseline.
 

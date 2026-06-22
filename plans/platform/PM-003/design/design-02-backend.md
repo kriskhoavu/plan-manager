@@ -50,7 +50,7 @@ The backend should keep all existing routes while moving orchestration out of `i
 |-------------|------------------------------------------------------------------------|
 | HTTP        | Route status codes and JSON shape for workspace, item, source, and Git |
 | Services    | Fake dependencies for scan, save, status move, commit, pull, and push  |
-| Scanner     | Configured source matching, fallback docs roots, item YAML precedence  |
+| Scanner     | Configured source matching, fallback docs roots, plan YAML precedence  |
 | Path guard  | Traversal, symlink escape, source scope, selected Git paths            |
 | Performance | Scan fixture tests that count Git calls after batching is introduced   |
 
@@ -61,4 +61,3 @@ The backend should keep all existing routes while moving orchestration out of `i
 - Add Git metadata batching only after scanner behavior has package-level tests.
 - Use source settings file hash and directory mod time to skip unchanged source traversal where safe.
 - Keep cache invalidation explicit and local to scan services.
-

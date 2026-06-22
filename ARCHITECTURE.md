@@ -83,7 +83,7 @@ User browser
 | Safety service         | `internal/application/safety`         | Centralizes write path and Git preflight decisions                    |
 | Search service         | `internal/application/search`         | Ranks indexed item matches without scanning workspaces                |
 | Scanner                | `internal/scanner`                    | Reads sources and builds item metadata                                |
-| Scanner metadata       | `internal/scanner/metadata_*`         | Parses `item.yaml`, legacy `plan.yaml`, and document metadata         |
+| Scanner metadata       | `internal/scanner/metadata_*`         | Parses `plan.yaml` and document metadata                              |
 | Scanner settings       | `internal/scanner/source_*`           | Matches source structure settings to item folders                     |
 | File access            | `internal/fileaccess`                 | Builds file trees, classifies bounded text reads, and writes Markdown |
 | Workspace file access  | `internal/workspacefiles`             | Lists, searches, creates, renames, and guards workspace paths         |
@@ -165,7 +165,7 @@ User clicks Scan
   -> API loads workspace config
   -> scanner reads each configured source
   -> scanner reads workspace-settings.yaml when present
-  -> scanner parses item.yaml, configured source rules, or fallback README/folder metadata
+  -> scanner parses plan.yaml, configured source rules, or fallback README/folder metadata
   -> scanner reads Git author and update time
   -> item index replaces that workspace's cached items
   -> registry updates lastScannedAt
@@ -347,6 +347,36 @@ Each configured source can optionally contain a workspace-owned settings file:
 <workspace>/<source>/workspace-settings.yaml
 ```
 
+The expected source layout is:
+
+```text
+<workspace>/
+└── <configured-source>/          # e.g. plans/
+    ├── workspace-settings.yaml   # optional source structure
+    └── <scope>/
+        └── <identifier>/
+            ├── plan.yaml         # preferred plan metadata
+            └── README.md
+```
+
+The canonical plan metadata format is:
+
+```yaml
+plan:
+  identifier: PM-123
+  scope: platform
+  title: Example feature
+  status: draft
+  owner: kris
+  tags: [backend, frontend]
+
+documents:
+  - id: overview
+    role: overview
+    path: README.md
+    label: Overview
+```
+
 This file lets a non-standard docs tree behave like a structured item source. The scanner currently supports segment-based path patterns where each segment is literal text or a `{variable}`. Generic product language uses `scope` and `identifier`; legacy `repository-settings.yaml`, `service`, and `ticket` are read for migration compatibility.
 
 Example:
@@ -363,7 +393,7 @@ cards:
       tags: [docs]
 ```
 
-If the file is missing or invalid, the scanner keeps the old fallback behavior for that source root. If a configured card later receives a metadata edit, the metadata writer creates `item.yaml` in that card directory, and `item.yaml` becomes the source of truth on later scans.
+If the file is missing or invalid, the scanner keeps the fallback behavior for that source root. If a configured card later receives a metadata edit, the metadata writer creates `plan.yaml` in that card directory, and `plan.yaml` becomes the source of truth on later scans.
 
 ## Item Data Model
 
@@ -400,7 +430,7 @@ If the file is missing or invalid, the scanner keeps the old fallback behavior f
 | `tags`           | `string[]` | Item tags                                                     |
 | `updatedAt`      | `string`   | Last Git update or filesystem time                            |
 | `description`    | `string`   | First README paragraph                                        |
-| `metadataSource` | `string`   | `item.yaml`, `workspace-settings`, `fallback`, or `docs`      |
+| `metadataSource` | `string`   | `plan.yaml`, `workspace-settings`, `fallback`, or `docs`      |
 | `itemPath`       | `string`   | Workspace-relative item path                                  |
 
 ### ItemDetail
@@ -409,7 +439,7 @@ If the file is missing or invalid, the scanner keeps the old fallback behavior f
 
 | Field       | Type             | Description                                      |
 |-------------|------------------|--------------------------------------------------|
-| `documents` | `ItemDocument[]` | Documents from `item.yaml` or fallback discovery |
+| `documents` | `ItemDocument[]` | Documents from `plan.yaml` or fallback discovery |
 | `metadata`  | `object`         | Parsed item metadata                             |
 | `warnings`  | `ScanWarning[]`  | Item-level warnings                              |
 | `counts`    | `object`         | Workspace counts such as file count              |
@@ -430,7 +460,7 @@ Structured item roots use:
 
 A folder is treated as a structured item when:
 
-- It contains `item.yaml`, or
+- It contains `plan.yaml`, or
 - Its identifier folder matches an uppercase identifier pattern such as `DI-170`.
 
 Freestyle docs roots are supported when:
@@ -438,11 +468,11 @@ Freestyle docs roots are supported when:
 - The configured root contains Markdown files, and
 - It does not contain structured item children.
 
-Plain freestyle docs roots are assigned the `unsorted` status so the Kanban board separates unstructured sources from normal workflow columns. Once a source root has a valid `workspace-settings.yaml`, matched cards use the configured status or `item.yaml`.
+Plain freestyle docs roots are assigned the `unsorted` status so the Kanban board separates unstructured sources from normal workflow columns. Once a source root has a valid `workspace-settings.yaml`, matched cards use the configured status or `plan.yaml`.
 
 Metadata precedence:
 
-1. `item.yaml`.
+1. `plan.yaml`.
 2. `workspace-settings.yaml` fields and README heading.
 3. README heading and inferred status.
 4. Folder names and fallback defaults.

@@ -196,7 +196,7 @@ cards:
       tags: [docs]
 `)
 	writeTestFile(t, root, "docs/api/feature/DI-101/README.md", "# README Title\n")
-	writeTestFile(t, root, "docs/api/feature/DI-101/item.yaml", `item:
+	writeTestFile(t, root, "docs/api/feature/DI-101/plan.yaml", `plan:
   identifier: DI-101
   title: YAML Title
   scope: backend
@@ -213,8 +213,8 @@ cards:
 		t.Fatalf("expected 1 item, got %d", len(data.Items))
 	}
 	item := data.Items[0]
-	if item.MetadataSource != "item.yaml" || item.Scope != "backend" || item.Title != "YAML Title" || item.Status != models.StatusReview {
-		t.Fatalf("item.yaml should win over workspace settings: %+v", item.ItemSummary)
+	if item.MetadataSource != "plan.yaml" || item.Scope != "backend" || item.Title != "YAML Title" || item.Status != models.StatusReview {
+		t.Fatalf("plan.yaml should win over workspace settings: %+v", item.ItemSummary)
 	}
 }
 
@@ -223,8 +223,8 @@ func TestStructuredSourceScanCharacterization(t *testing.T) {
 	writeTestFile(t, root, "plans/platform/PM-003/README.md", "# Technical Architecture Refactoring\n\nImprove internals.\n")
 	writeTestFile(t, root, "plans/platform/PM-003/design/design-01-architecture.md", "# Architecture\n")
 	writeTestFile(t, root, "plans/platform/PM-003/scenario/scenario-00-overview.md", "# Scenario\n")
-	writeTestFile(t, root, "plans/platform/PM-003/item.yaml", `schemaVersion: 1
-item:
+	writeTestFile(t, root, "plans/platform/PM-003/plan.yaml", `schemaVersion: 1
+plan:
   ticket: PM-003
   title: YAML Architecture Title
   service: platform
@@ -252,7 +252,7 @@ documents:
 	if item.Scope != "platform" || item.Identifier != "PM-003" || item.Title != "YAML Architecture Title" {
 		t.Fatalf("unexpected structured item identity: %+v", item.ItemSummary)
 	}
-	if item.Status != models.StatusReview || item.MetadataSource != "item.yaml" {
+	if item.Status != models.StatusReview || item.MetadataSource != "plan.yaml" {
 		t.Fatalf("unexpected structured item metadata: %+v", item.ItemSummary)
 	}
 	if len(item.Documents) != 1 || item.Documents[0].Path != "README.md" {

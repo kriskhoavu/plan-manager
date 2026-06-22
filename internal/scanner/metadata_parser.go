@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,23 +10,18 @@ import (
 )
 
 type planYAML struct {
-	Item struct {
+	Plan struct {
 		Identifier string   `yaml:"identifier"`
 		Title      string   `yaml:"title"`
 		Scope      string   `yaml:"scope"`
 		Status     string   `yaml:"status"`
 		Owner      string   `yaml:"owner"`
 		Tags       []string `yaml:"tags"`
-	} `yaml:"item"`
+	} `yaml:"plan"`
 	Documents []models.ItemDocument `yaml:"documents"`
 }
 
-func readItemYAML(root string) ([]byte, string, error) {
-	if data, err := os.ReadFile(filepath.Join(root, "item.yaml")); err == nil {
-		return data, "item.yaml", nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, "", err
-	}
+func readPlanYAML(root string) ([]byte, string, error) {
 	data, err := os.ReadFile(filepath.Join(root, "plan.yaml"))
 	if err != nil {
 		return nil, "", err
@@ -68,7 +62,7 @@ func normalizeDocuments(docs []models.ItemDocument) []models.ItemDocument {
 	return docs
 }
 
-func parseItemYAML(data string) planYAML {
+func parsePlanYAML(data string) planYAML {
 	var parsed planYAML
 	section := ""
 	var current *models.ItemDocument
@@ -79,31 +73,31 @@ func parseItemYAML(data string) planYAML {
 		indent := len(raw) - len(strings.TrimLeft(raw, " "))
 		line := strings.TrimSpace(raw)
 		switch line {
-		case "item:", "plan:":
-			section = "item"
+		case "plan:":
+			section = "plan"
 			continue
 		case "documents:":
 			section = "documents"
 			continue
 		}
-		if section == "item" && indent >= 2 {
+		if section == "plan" && indent >= 2 {
 			key, value, ok := splitYAMLPair(line)
 			if !ok {
 				continue
 			}
 			switch key {
 			case "identifier", "ticket":
-				parsed.Item.Identifier = value
+				parsed.Plan.Identifier = value
 			case "title":
-				parsed.Item.Title = value
+				parsed.Plan.Title = value
 			case "scope", "service":
-				parsed.Item.Scope = value
+				parsed.Plan.Scope = value
 			case "status":
-				parsed.Item.Status = value
+				parsed.Plan.Status = value
 			case "owner":
-				parsed.Item.Owner = value
+				parsed.Plan.Owner = value
 			case "tags":
-				parsed.Item.Tags = parseYAMLList(value)
+				parsed.Plan.Tags = parseYAMLList(value)
 			}
 			continue
 		}

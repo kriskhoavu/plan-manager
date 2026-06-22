@@ -35,14 +35,14 @@ func TestSaveMetadataCreatesPlanYAML(t *testing.T) {
 	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusInProgress, Owner: "Khoa Vu", Tags: []string{"items", "items", "edit"}}); err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(itemRoot, "item.yaml"))
+	data, err := os.ReadFile(filepath.Join(itemRoot, "plan.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	text := string(data)
 	for _, want := range []string{"identifier: PM-002", "status: in_progress", "owner: Khoa Vu", "- items", "- edit"} {
 		if !strings.Contains(text, want) {
-			t.Fatalf("item.yaml missing %q:\n%s", want, text)
+			t.Fatalf("plan.yaml missing %q:\n%s", want, text)
 		}
 	}
 }
@@ -95,7 +95,7 @@ func TestCreateItemWritesStarterFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, rel := range []string{"README.md", "scenario/scenario-00-overview.md", "design/design-01-backend.md", "design/design-02-frontend.md", "implementation-item.md", "item.yaml"} {
+	for _, rel := range []string{"README.md", "scenario/scenario-00-overview.md", "design/design-01-backend.md", "design/design-02-frontend.md", "implementation-item.md", "plan.yaml"} {
 		if _, err := os.Stat(filepath.Join(root, "items", "platform", "PM-003", filepath.FromSlash(rel))); err != nil {
 			t.Fatalf("expected %s: %v", rel, err)
 		}
