@@ -425,6 +425,12 @@ type GitStatus struct {
 	Changes     []GitChange `json:"changes" yaml:"changes"`
 }
 
+type WorkspaceBranches struct {
+	WorkspaceID string   `json:"workspaceId" yaml:"workspaceId"`
+	Current     string   `json:"current" yaml:"current"`
+	Branches    []string `json:"branches" yaml:"branches"`
+}
+
 type GitCommitInput struct {
 	Message string   `json:"message" yaml:"message"`
 	Paths   []string `json:"paths" yaml:"paths"`

@@ -2,6 +2,8 @@ package git
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"plan-manager/internal/application/apperrors"
 	"plan-manager/internal/gitadapter"
@@ -28,6 +30,40 @@ func (s *Service) Status(workspaceID string) (models.GitStatus, error) {
 		return models.GitStatus{}, err
 	}
 	return s.git.Status(workspace.ID, workspace.Path)
+}
+
+func (s *Service) Branches(workspaceID string) (models.WorkspaceBranches, error) {
+	workspace, err := s.workspace(workspaceID)
+	if err != nil {
+		return models.WorkspaceBranches{}, err
+	}
+	current, err := s.git.CurrentBranch(workspace.Path)
+	if err != nil {
+		return models.WorkspaceBranches{}, err
+	}
+	branches, err := s.git.ListBranches(workspace.Path)
+	if err != nil {
+		return models.WorkspaceBranches{}, err
+	}
+	return normalizeWorkspaceBranches(workspace.ID, current, branches), nil
+}
+
+func normalizeWorkspaceBranches(workspaceID, current string, branches []string) models.WorkspaceBranches {
+	unique := make(map[string]struct{}, len(branches)+1)
+	for _, branch := range branches {
+		if branch = strings.TrimSpace(branch); branch != "" {
+			unique[branch] = struct{}{}
+		}
+	}
+	if current = strings.TrimSpace(current); current != "" {
+		unique[current] = struct{}{}
+	}
+	names := make([]string, 0, len(unique))
+	for branch := range unique {
+		names = append(names, branch)
+	}
+	sort.Strings(names)
+	return models.WorkspaceBranches{WorkspaceID: workspaceID, Current: current, Branches: names}
 }
 
 func (s *Service) Fetch(workspaceID string, _ models.GitOperationInput) models.GitOperationResult {

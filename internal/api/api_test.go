@@ -453,6 +453,32 @@ func TestGitPullDirtyTreeReturnsRecoveryHint(t *testing.T) {
 	}
 }
 
+func TestGitBranchesReturnsCurrentSortedLocalBranches(t *testing.T) {
+	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
+	for _, branch := range []string{"zeta", "alpha"} {
+		if output, err := exec.Command("git", "-C", workspace.Path, "branch", branch).CombinedOutput(); err != nil {
+			t.Fatalf("create branch %q: %v: %s", branch, err, output)
+		}
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/workspaces/"+workspace.ID+"/git/branches", nil)
+	response := httptest.NewRecorder()
+	apiHandler.Routes().ServeHTTP(response, request)
+
+	var payload models.WorkspaceBranches
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"alpha", "main", "zeta"}
+	if response.Code != http.StatusOK || payload.WorkspaceID != workspace.ID || payload.Current != "main" || len(payload.Branches) != len(want) {
+		t.Fatalf("status = %d, payload = %#v", response.Code, payload)
+	}
+	for index := range want {
+		if payload.Branches[index] != want[index] {
+			t.Fatalf("branch %d = %q, want %q", index, payload.Branches[index], want[index])
+		}
+	}
+}
+
 func TestGitCommitRejectsPathOutsideConfiguredSources(t *testing.T) {
 	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
 	body := strings.NewReader(`{"message":"test","paths":["../secret.md"]}`)

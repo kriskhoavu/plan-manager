@@ -26,3 +26,16 @@ func TestValidatePathsRejectsEmptyEscapedAndUnregisteredPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeWorkspaceBranchesSortsDeduplicatesAndKeepsCurrent(t *testing.T) {
+	result := normalizeWorkspaceBranches("workspace", "feature/current", []string{"main", "alpha", "main", " "})
+	want := []string{"alpha", "feature/current", "main"}
+	if result.WorkspaceID != "workspace" || result.Current != "feature/current" || len(result.Branches) != len(want) {
+		t.Fatalf("branches = %#v", result)
+	}
+	for index := range want {
+		if result.Branches[index] != want[index] {
+			t.Fatalf("branch %d = %q, want %q", index, result.Branches[index], want[index])
+		}
+	}
+}
