@@ -8,13 +8,15 @@ describe('routeFromLocation', () => {
     expect(routeFromLocation()).toEqual({ name: 'workspace', itemId: 'PM-003 Architecture' });
   });
 
-  it('parses top-level routes', () => {
+  it('falls removed list routes back to Kanban', () => {
     window.history.pushState(null, '', '/items');
-    expect(routeFromLocation()).toEqual({ name: 'items' });
+    expect(routeFromLocation()).toEqual({ name: 'kanban' });
 
     window.history.pushState(null, '', '/branches');
-    expect(routeFromLocation()).toEqual({ name: 'branches' });
+    expect(routeFromLocation()).toEqual({ name: 'kanban' });
+  });
 
+  it('parses retained top-level routes', () => {
     window.history.pushState(null, '', '/workspaces');
     expect(routeFromLocation()).toEqual({ name: 'workspaces' });
   });

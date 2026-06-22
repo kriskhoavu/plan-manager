@@ -8,8 +8,6 @@ export interface ExplorerLocation {
 
 export type Route =
   | { name: 'kanban' }
-  | { name: 'items' }
-  | { name: 'branches' }
   | { name: 'workspaces' }
   | { name: 'explorer'; location?: ExplorerLocation }
   | { name: 'workspace'; itemId: string };
@@ -18,12 +16,6 @@ export function routeFromLocation(): Route {
   const path = window.location.pathname;
   if (path.startsWith('/items/')) {
     return { name: 'workspace', itemId: decodeURIComponent(path.split('/')[2] ?? '') };
-  }
-  if (path === '/items') {
-    return { name: 'items' };
-  }
-  if (path.startsWith('/branches')) {
-    return { name: 'branches' };
   }
   if (path.startsWith('/workspaces')) {
     return { name: 'workspaces' };
@@ -42,11 +34,7 @@ export function pathForRoute(route: Route): string {
     ? `/items/${encodeURIComponent(route.itemId)}`
     : route.name === 'workspaces'
       ? '/workspaces'
-      : route.name === 'items'
-        ? '/items'
-        : route.name === 'branches'
-          ? '/branches'
-          : '/kanban';
+      : '/kanban';
 }
 
 export function explorerLocationFromSearch(search: string): ExplorerLocation | undefined {
