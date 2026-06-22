@@ -21,9 +21,15 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
   const [activeIndex, setActiveIndex] = useState(0);
   const [gitStateByPath, setGitStateByPath] = useState<Map<string, WorkspacePathGitState>>(new Map());
 
-  useEffect(() => {
-    api.items(new URLSearchParams()).then((items) => setDecorations(buildItemDecorations(items))).catch(() => setDecorations(new Map()));
-  }, [workspaces]);
+  const loadDecorations = useCallback(async () => {
+    try {
+      setDecorations(buildItemDecorations(await api.items(new URLSearchParams())));
+    } catch {
+      setDecorations(new Map());
+    }
+  }, []);
+
+  useEffect(() => { void loadDecorations(); }, [loadDecorations, workspaces]);
 
   const loadGitStates = useCallback(async () => {
     const maps = await Promise.all(workspaces.map(async (workspace) => {
@@ -100,6 +106,17 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
     void loadGitStates();
   }, [expandedNodeIds, loadDirectory, loadGitStates]);
 
+  const refreshWorkspaceBranch = useCallback(async (workspaceId: string) => {
+    const prefix = `${workspaceId}:`;
+    setCache((current) => new Map([...current].filter(([key]) => !key.startsWith(prefix))));
+    setGitStateByPath((current) => new Map([...current].filter(([key]) => !key.startsWith(prefix))));
+    const paths = [...expandedNodeIds]
+      .filter((id) => id.startsWith(prefix))
+      .map((id) => id.slice(prefix.length));
+    await Promise.all(paths.map((path) => loadDirectory(workspaceId, path, true)));
+    await Promise.all([loadGitStates(), loadDecorations()]);
+  }, [expandedNodeIds, loadDecorations, loadDirectory, loadGitStates]);
+
   const select = useCallback((workspaceId: string, path: string) => onLocationChange?.({ workspaceId, path: path || undefined }), [onLocationChange]);
 
   const invalidateDirectories = useCallback(async (workspaceId: string, paths: string[]) => {
@@ -157,7 +174,7 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
 
 	const rows = useMemo(() => flattenVisibleTree({ workspaces, expandedNodeIds, cache, includeIgnored: showIgnored, decorations, filter, mode }), [cache, decorations, expandedNodeIds, filter, mode, showIgnored, workspaces]);
 
-	return { rows, cache, decorations, gitStateByPath, expandedNodeIds, showIgnored, mode, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, setMode, toggleExpanded, loadDirectory, refresh, collapseAll, select, invalidateDirectories, expandToPath };
+	return { rows, cache, decorations, gitStateByPath, expandedNodeIds, showIgnored, mode, filter, activeIndex, selection, setFilter, setActiveIndex, setShowIgnored, setMode, toggleExpanded, loadDirectory, refresh, refreshWorkspaceBranch, collapseAll, select, invalidateDirectories, expandToPath };
 }
 
 function readMode(): ExplorerTreeMode {

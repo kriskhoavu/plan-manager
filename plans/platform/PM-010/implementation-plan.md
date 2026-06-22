@@ -9,7 +9,7 @@ Add guarded local branch selection to each Explorer workspace root. Reload only 
 | Phase | Name                                  | Status |
 |-------|---------------------------------------|--------|
 | B1    | Workspace Branch Query And API        | ✅     |
-| F1    | Branch Client And Workspace State     |        |
+| F1    | Branch Client And Workspace State     | ✅     |
 | F2    | Explorer Branch Selector And Final QA |        |
 
 ## Backend Phases
@@ -41,11 +41,11 @@ PM-010: Add workspace branch query API
 
 **Deliverables:**
 
-- [ ] Add the `WorkspaceBranches` frontend type.
-- [ ] Add the branches API client.
-- [ ] Add workspace-scoped branch loading and switching state.
-- [ ] Add workspace-scoped tree and Git cache invalidation.
-- [ ] Cover API and state behavior.
+- [x] Add the `WorkspaceBranches` frontend type.
+- [x] Add the branches API client.
+- [x] Add workspace-scoped branch loading and switching state.
+- [x] Add workspace-scoped tree and Git cache invalidation.
+- [x] Cover API and state behavior.
 
 **Verification:** `rtk npm run typecheck && rtk npm test -- --run web/src/shared/api web/src/features/workspace-explorer`
 

@@ -21,6 +21,7 @@ import type {
   ItemStatusUpdateInput,
   ItemSummary,
   WorkspaceConfig,
+  WorkspaceBranches,
   WorkspaceInput,
   WorkspaceHealth,
   WorkspaceDirectoryListing,
@@ -157,6 +158,10 @@ export const api = {
   createItem: (input: NewItemInput) => request<WriteResult>('/api/items', { method: 'POST', body: JSON.stringify(input) }),
   diff: (id: string) => request<{ diff: string }>(`/api/items/${id}/diff`),
   gitStatus: (workspaceId: string) => request<GitStatus>(`/api/workspaces/${workspaceId}/git/status`).then(normalizeGitStatus),
+  workspaceBranches: async (workspaceId: string) => {
+    const response = await request<WorkspaceBranches>(`/api/workspaces/${encodeURIComponent(workspaceId)}/git/branches`);
+    return { ...response, current: response.current ?? '', branches: Array.isArray(response.branches) ? response.branches : [] };
+  },
   gitFetch: (workspaceId: string, input: GitOperationInput = {}) =>
     request<GitOperationResult>(`/api/workspaces/${workspaceId}/git/fetch`, { method: 'POST', body: JSON.stringify(input) }).then(normalizeGitResult),
   gitPull: (workspaceId: string, input: GitOperationInput = {}) =>

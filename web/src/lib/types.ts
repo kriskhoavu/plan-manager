@@ -355,6 +355,12 @@ export interface GitStatus {
   changes: GitChange[];
 }
 
+export interface WorkspaceBranches {
+  workspaceId: string;
+  current: string;
+  branches: string[];
+}
+
 export interface GitCommitInput {
   message: string;
   paths: string[];

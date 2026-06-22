@@ -34,6 +34,17 @@ describe('shared api facade', () => {
     });
   });
 
+  it('normalizes workspace branch responses', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ workspaceId: 'workspace/one', current: 'main', branches: null })
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(api.workspaceBranches('workspace/one')).resolves.toEqual({ workspaceId: 'workspace/one', current: 'main', branches: [] });
+    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/workspace%2Fone/git/branches', expect.any(Object));
+  });
+
   it('normalizes workspace directory listings and encodes file paths', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ workspaceId: 'w1', entries: [{ id: 'one', name: 'one', path: 'one', type: 'directory' }] }) })
