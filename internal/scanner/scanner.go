@@ -35,11 +35,10 @@ func (s *Scanner) Scan(workspace models.WorkspaceConfig) (ScanData, error) {
 	if err != nil {
 		branch = workspace.BaselineBranch
 	}
-	branchForIdentifier := s.branchMatcher(workspace.Path)
 	var out ScanData
 	for _, source := range workspace.Sources {
 		root := filepath.Join(workspace.Path, filepath.FromSlash(source))
-		items, warnings := s.scanItemDirectory(workspace, branch, source, root, branchForIdentifier)
+		items, warnings := s.scanItemDirectory(workspace, branch, source, root)
 		out.Items = append(out.Items, items...)
 		out.Warnings = append(out.Warnings, warnings...)
 	}
@@ -49,26 +48,7 @@ func (s *Scanner) Scan(workspace models.WorkspaceConfig) (ScanData, error) {
 	return out, nil
 }
 
-func (s *Scanner) branchMatcher(workspacePath string) func(string) string {
-	branches, err := s.git.ListBranches(workspacePath)
-	if err != nil {
-		return func(string) string { return "" }
-	}
-	return func(identifier string) string {
-		identifier = strings.ToLower(strings.TrimSpace(identifier))
-		if identifier == "" {
-			return ""
-		}
-		for _, branch := range branches {
-			if strings.Contains(strings.ToLower(branch), identifier) {
-				return branch
-			}
-		}
-		return ""
-	}
-}
-
-func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, source, root string, branchForIdentifier func(string) string) ([]models.ItemDetail, []models.ScanWarning) {
+func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, source, root string) ([]models.ItemDetail, []models.ScanWarning) {
 	var items []models.ItemDetail
 	var warnings []models.ScanWarning
 	entries, err := os.ReadDir(root)
@@ -79,7 +59,7 @@ func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, so
 	if hasSettings {
 		warnings = append(warnings, settingsWarnings...)
 		if len(settingsWarnings) == 0 {
-			configuredItems, configuredWarnings := s.scanConfiguredItemDirectory(workspace, branch, source, root, settings, branchForIdentifier)
+			configuredItems, configuredWarnings := s.scanConfiguredItemDirectory(workspace, branch, source, root, settings)
 			warnings = append(warnings, configuredWarnings...)
 			if len(configuredItems) > 0 {
 				return configuredItems, warnings
@@ -116,11 +96,7 @@ func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, so
 			}
 			itemRoot := filepath.Join(scopeRoot, identifierEntry.Name())
 			relItemPath := filepath.ToSlash(filepath.Join(source, scopeEntry.Name(), identifierEntry.Name()))
-			itemBranch := branch
-			if matchedBranch := branchForIdentifier(identifierEntry.Name()); matchedBranch != "" {
-				itemBranch = matchedBranch
-			}
-			detail, itemWarnings, err := s.parseItem(workspace, itemBranch, scopeEntry.Name(), identifierEntry.Name(), relItemPath, itemRoot)
+			detail, itemWarnings, err := s.parseItem(workspace, branch, scopeEntry.Name(), identifierEntry.Name(), relItemPath, itemRoot)
 			if err != nil {
 				warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: err.Error()})
 				continue
@@ -132,7 +108,7 @@ func (s *Scanner) scanItemDirectory(workspace models.WorkspaceConfig, branch, so
 	return items, warnings
 }
 
-func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, branch, source, root string, settings models.SourceStructureSettings, branchForIdentifier func(string) string) ([]models.ItemDetail, []models.ScanWarning) {
+func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, branch, source, root string, settings models.SourceStructureSettings) ([]models.ItemDetail, []models.ScanWarning) {
 	var items []models.ItemDetail
 	var warnings []models.ScanWarning
 	seen := map[string]bool{}
@@ -159,11 +135,7 @@ func (s *Scanner) scanConfiguredItemDirectory(workspace models.WorkspaceConfig, 
 				continue
 			}
 			relItemPath := filepath.ToSlash(filepath.Join(source, relFromRoot))
-			itemBranch := branch
-			if matchedBranch := branchForIdentifier(identifier); matchedBranch != "" {
-				itemBranch = matchedBranch
-			}
-			detail, itemWarnings, err := s.parseItem(workspace, itemBranch, scope, identifier, relItemPath, match.path)
+			detail, itemWarnings, err := s.parseItem(workspace, branch, scope, identifier, relItemPath, match.path)
 			if err != nil {
 				warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: err.Error()})
 				continue
@@ -221,24 +193,28 @@ func (s *Scanner) parseItem(workspace models.WorkspaceConfig, branch, scope, ide
 	metadata := map[string]any{}
 
 	if data, source, err := readPlanYAML(itemRoot); err == nil {
-		parsed := parsePlanYAML(string(data))
-		metaSource = source
-		if parsed.Plan.Identifier != "" {
-			identifier = parsed.Plan.Identifier
+		parsed, parseErr := parsePlanYAML(string(data))
+		if parseErr != nil {
+			warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: parseErr.Error()})
+		} else {
+			metaSource = source
+			if parsed.Plan.Identifier != "" {
+				identifier = parsed.Plan.Identifier
+			}
+			if parsed.Plan.Scope != "" {
+				scope = parsed.Plan.Scope
+			}
+			if parsed.Plan.Title != "" {
+				title = parsed.Plan.Title
+			}
+			owner = parsed.Plan.Owner
+			status = NormalizeStatus(parsed.Plan.Status)
+			if parsed.Plan.Tags != nil {
+				tags = parsed.Plan.Tags
+			}
+			documents = resolveDocuments(itemRoot, parsed.Documents)
+			metadata["plan"] = parsed.Plan
 		}
-		if parsed.Plan.Scope != "" {
-			scope = parsed.Plan.Scope
-		}
-		if parsed.Plan.Title != "" {
-			title = parsed.Plan.Title
-		}
-		owner = parsed.Plan.Owner
-		status = NormalizeStatus(parsed.Plan.Status)
-		if parsed.Plan.Tags != nil {
-			tags = parsed.Plan.Tags
-		}
-		documents = normalizeDocuments(parsed.Documents)
-		metadata["plan"] = parsed.Plan
 	} else if !errors.Is(err, os.ErrNotExist) {
 		warnings = append(warnings, models.ScanWarning{ItemPath: relItemPath, Message: err.Error()})
 	}
@@ -246,10 +222,10 @@ func (s *Scanner) parseItem(workspace models.WorkspaceConfig, branch, scope, ide
 	readme := filepath.Join(itemRoot, "README.md")
 	description := ""
 	if data, err := os.ReadFile(readme); err == nil {
+		if inferredTitle := titleFromHeading(firstHeading(string(data)), identifier); inferredTitle != "" && title == titleFromIdentifier(identifier) {
+			title = inferredTitle
+		}
 		if metaSource == "fallback" {
-			if h := firstHeading(string(data)); h != "" {
-				title = h
-			}
 			status = inferStatus(itemRoot)
 		}
 		description = firstParagraph(string(data))
@@ -300,28 +276,57 @@ func fallbackDocuments(itemRoot string) []models.ItemDocument {
 			return nil
 		}
 		rel, _ := filepath.Rel(itemRoot, path)
-		role := "other"
 		relSlash := filepath.ToSlash(rel)
-		if relSlash == "README.md" {
-			role = "overview"
-		} else if strings.HasPrefix(relSlash, "scenario/") {
-			role = "scenario"
-		} else if strings.HasPrefix(relSlash, "design/") {
-			role = "design"
-		} else if relSlash == "implementation-item.md" {
-			role = "implementation"
-		}
-		docs = append(docs, models.ItemDocument{
-			ID: fileID(relSlash), Role: role, Path: relSlash, Label: labelFromPath(relSlash),
-		})
+		docs = append(docs, inferDocumentAt(itemRoot, relSlash))
 		return nil
 	})
-	sort.Slice(docs, func(i, j int) bool { return naturalLess(docs[i].Path, docs[j].Path) })
+	sort.Slice(docs, func(i, j int) bool { return documentLess(docs[i], docs[j]) })
+	return docs
+}
+
+func InferDocuments(itemRoot string) []models.ItemDocument {
+	return fallbackDocuments(itemRoot)
+}
+
+func resolveDocuments(itemRoot string, overrides []models.ItemDocument) []models.ItemDocument {
+	docs := fallbackDocuments(itemRoot)
+	byPath := make(map[string]int, len(docs))
+	for i := range docs {
+		byPath[filepath.ToSlash(docs[i].Path)] = i
+	}
+	for _, override := range overrides {
+		override.Path = filepath.ToSlash(strings.TrimSpace(override.Path))
+		if override.Path == "" {
+			continue
+		}
+		index, found := byPath[override.Path]
+		if !found {
+			docs = append(docs, normalizeDocuments([]models.ItemDocument{override})[0])
+			byPath[override.Path] = len(docs) - 1
+			continue
+		}
+		if override.ID != "" {
+			docs[index].ID = override.ID
+		}
+		if override.Role != "" {
+			docs[index].Role = override.Role
+		}
+		if override.Track != "" {
+			docs[index].Track = override.Track
+		}
+		if override.Label != "" {
+			docs[index].Label = override.Label
+		}
+	}
+	sort.SliceStable(docs, func(i, j int) bool { return documentLess(docs[i], docs[j]) })
 	return docs
 }
 
 func inferStatus(itemRoot string) models.ItemStatus {
-	data, err := os.ReadFile(filepath.Join(itemRoot, "implementation-item.md"))
+	data, err := os.ReadFile(filepath.Join(itemRoot, "implementation-plan.md"))
+	if os.IsNotExist(err) {
+		data, err = os.ReadFile(filepath.Join(itemRoot, "implementation-item.md"))
+	}
 	if err != nil {
 		return models.StatusDraft
 	}
@@ -342,6 +347,30 @@ func firstHeading(markdown string) string {
 		}
 	}
 	return ""
+}
+
+func InferPlanTitle(itemRoot, identifier string) string {
+	data, err := os.ReadFile(filepath.Join(itemRoot, "README.md"))
+	if err != nil {
+		return ""
+	}
+	return titleFromHeading(firstHeading(string(data)), identifier)
+}
+
+func titleFromHeading(heading, identifier string) string {
+	heading = strings.TrimSpace(heading)
+	identifier = strings.TrimSpace(identifier)
+	if heading == "" {
+		return ""
+	}
+	if identifier != "" && strings.HasPrefix(strings.ToLower(heading), strings.ToLower(identifier)) {
+		trimmed := strings.TrimSpace(heading[len(identifier):])
+		trimmed = strings.TrimLeft(trimmed, ":-–— ")
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return heading
 }
 
 func firstParagraph(markdown string) string {
@@ -430,6 +459,89 @@ func labelFromPath(path string) string {
 	base = strings.ReplaceAll(base, "-", " ")
 	base = strings.ReplaceAll(base, "_", " ")
 	return strings.Title(base)
+}
+
+func inferDocument(path string) models.ItemDocument {
+	path = filepath.ToSlash(path)
+	lower := strings.ToLower(path)
+	doc := models.ItemDocument{ID: fileID(path), Role: "other", Path: path, Label: labelFromPath(path)}
+	switch {
+	case lower == "readme.md":
+		doc.Role = "overview"
+		doc.Label = "Overview"
+	case strings.HasPrefix(lower, "scenario/"):
+		doc.Role = "scenario"
+		name := stripDocumentSequence(path, "scenario")
+		if strings.EqualFold(name, "overview") {
+			doc.Label = "Scenario Overview"
+		} else {
+			doc.Label = strings.Title(titleFromIdentifier(name))
+		}
+	case strings.HasPrefix(lower, "design/"):
+		doc.Role = "design"
+		name := stripDocumentSequence(path, "design")
+		doc.Track = inferDocumentTrack(name)
+		if doc.Track != "" && strings.EqualFold(name, doc.Track) {
+			doc.Label = strings.Title(doc.Track) + " Design"
+		} else {
+			doc.Label = strings.Title(titleFromIdentifier(name))
+		}
+	case lower == "implementation-plan.md", lower == "implementation-item.md":
+		doc.Role = "implementation"
+		doc.Label = "Implementation Plan"
+	}
+	return doc
+}
+
+func inferDocumentAt(itemRoot, path string) models.ItemDocument {
+	doc := inferDocument(path)
+	if doc.Role != "design" || doc.Track != "" {
+		return doc
+	}
+	data, err := os.ReadFile(filepath.Join(itemRoot, filepath.FromSlash(path)))
+	if err != nil {
+		return doc
+	}
+	heading := strings.ToLower(firstHeading(string(data)))
+	for _, track := range []string{"backend", "frontend", "infrastructure", "pipeline"} {
+		if strings.Contains(heading, track) {
+			doc.Track = track
+			break
+		}
+	}
+	return doc
+}
+
+func stripDocumentSequence(path, prefix string) string {
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	pattern := regexp.MustCompile(`(?i)^` + regexp.QuoteMeta(prefix) + `-\d+-`)
+	return pattern.ReplaceAllString(name, "")
+}
+
+func inferDocumentTrack(name string) string {
+	lower := strings.ToLower(name)
+	for _, track := range []string{"backend", "frontend", "infrastructure", "pipeline"} {
+		if lower == track || strings.HasPrefix(lower, track+"-") || strings.HasSuffix(lower, "-"+track) {
+			return track
+		}
+	}
+	return ""
+}
+
+func documentLess(left, right models.ItemDocument) bool {
+	ranks := map[string]int{"overview": 0, "scenario": 1, "design": 2, "implementation": 3, "other": 4}
+	leftRank, leftOK := ranks[left.Role]
+	if !leftOK {
+		leftRank = 4
+	}
+	rightRank, rightOK := ranks[right.Role]
+	if !rightOK {
+		rightRank = 4
+	}
+	if leftRank != rightRank {
+		return leftRank < rightRank
+	}
+	return naturalLess(left.Path, right.Path)
 }
 
 func countMarkdownFiles(root string) int {

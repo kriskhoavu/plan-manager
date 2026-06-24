@@ -115,7 +115,7 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 		"scenario/scenario-00-overview.md": "# Scenario Overview\n\n",
 		"design/design-01-backend.md":      "# Backend Design\n\n",
 		"design/design-02-frontend.md":     "# Frontend Design\n\n",
-		"implementation-item.md":           "# Implementation Item\n\n",
+		"implementation-plan.md":           "# Implementation Plan\n\n",
 	}
 	for rel, content := range files {
 		if err := os.WriteFile(filepath.Join(fullRoot, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
@@ -131,7 +131,6 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 			Owner:      strings.TrimSpace(input.Owner),
 			Tags:       cleanTags(input.Tags),
 		},
-		Documents: starterDocuments(),
 	}
 	if err := writePlanMetadataAt(fullRoot, meta); err != nil {
 		return models.WriteResult{}, err
@@ -187,8 +186,10 @@ type planYAML struct {
 
 type planFields struct {
 	Identifier string   `yaml:"identifier,omitempty"`
+	Ticket     string   `yaml:"ticket,omitempty"`
 	Title      string   `yaml:"title,omitempty"`
 	Scope      string   `yaml:"scope,omitempty"`
+	Service    string   `yaml:"service,omitempty"`
 	Status     string   `yaml:"status,omitempty"`
 	Owner      string   `yaml:"owner,omitempty"`
 	Tags       []string `yaml:"tags,omitempty"`
@@ -211,6 +212,14 @@ func readPlanMetadata(workspace models.WorkspaceConfig, item models.ItemDetail) 
 	if err := yaml.Unmarshal(data, &meta); err != nil {
 		return meta, err
 	}
+	if meta.Plan.Identifier == "" {
+		meta.Plan.Identifier = meta.Plan.Ticket
+	}
+	if meta.Plan.Scope == "" {
+		meta.Plan.Scope = meta.Plan.Service
+	}
+	meta.Plan.Ticket = ""
+	meta.Plan.Service = ""
 	return meta, nil
 }
 
@@ -259,6 +268,7 @@ func writePlanMetadata(workspace models.WorkspaceConfig, item models.ItemDetail,
 }
 
 func writePlanMetadataAt(root string, meta planYAML) error {
+	compactPlanMetadata(root, &meta)
 	data, err := yaml.Marshal(meta)
 	if err != nil {
 		return err
@@ -266,14 +276,54 @@ func writePlanMetadataAt(root string, meta planYAML) error {
 	return os.WriteFile(filepath.Join(root, "plan.yaml"), data, 0o644)
 }
 
-func starterDocuments() []models.ItemDocument {
-	return []models.ItemDocument{
-		{ID: "README_md", Role: "overview", Path: "README.md", Label: "README"},
-		{ID: "scenario__scenario-00-overview_md", Role: "scenario", Path: "scenario/scenario-00-overview.md", Label: "Scenario Overview"},
-		{ID: "design__design-01-backend_md", Role: "design", Track: "backend", Path: "design/design-01-backend.md", Label: "Backend Design"},
-		{ID: "design__design-02-frontend_md", Role: "design", Track: "frontend", Path: "design/design-02-frontend.md", Label: "Frontend Design"},
-		{ID: "implementation-plan_md", Role: "implementation", Path: "implementation-item.md", Label: "Implementation Item"},
+func compactPlanMetadata(root string, meta *planYAML) {
+	identifier := strings.TrimSpace(meta.Plan.Identifier)
+	if identifier == "" {
+		identifier = filepath.Base(root)
 	}
+	if strings.EqualFold(identifier, filepath.Base(root)) {
+		meta.Plan.Identifier = ""
+	}
+	if strings.EqualFold(strings.TrimSpace(meta.Plan.Scope), filepath.Base(filepath.Dir(root))) {
+		meta.Plan.Scope = ""
+	}
+	if inferredTitle := scanner.InferPlanTitle(root, identifier); inferredTitle != "" && meta.Plan.Title == inferredTitle {
+		meta.Plan.Title = ""
+	}
+	meta.Plan.Ticket = ""
+	meta.Plan.Service = ""
+	meta.Documents = compactDocumentOverrides(root, meta.Documents)
+}
+
+func compactDocumentOverrides(root string, documents []models.ItemDocument) []models.ItemDocument {
+	inferred := scanner.InferDocuments(root)
+	byPath := make(map[string]models.ItemDocument, len(inferred))
+	for _, doc := range inferred {
+		byPath[filepath.ToSlash(doc.Path)] = doc
+	}
+	overrides := make([]models.ItemDocument, 0, len(documents))
+	for _, doc := range documents {
+		doc.Path = filepath.ToSlash(strings.TrimSpace(doc.Path))
+		base, found := byPath[doc.Path]
+		if !found {
+			overrides = append(overrides, doc)
+			continue
+		}
+		override := models.ItemDocument{Path: doc.Path}
+		if doc.Role != "" && doc.Role != base.Role {
+			override.Role = doc.Role
+		}
+		if doc.Track != "" && doc.Track != base.Track {
+			override.Track = doc.Track
+		}
+		if doc.Label != "" && doc.Label != base.Label {
+			override.Label = doc.Label
+		}
+		if override.Role != "" || override.Track != "" || override.Label != "" {
+			overrides = append(overrides, override)
+		}
+	}
+	return overrides
 }
 
 func validateSource(workspace models.WorkspaceConfig, dir string) (string, error) {

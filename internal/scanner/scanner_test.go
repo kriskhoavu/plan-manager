@@ -28,7 +28,7 @@ func TestNormalizeStatus(t *testing.T) {
 func TestFallbackDocumentsOrdersKnownPlanFiles(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "README.md", "# Test\n")
-	writeTestFile(t, root, "implementation-item.md", "# Item\n")
+	writeTestFile(t, root, "implementation-plan.md", "# Implementation\n")
 	writeTestFile(t, root, "scenario/scenario-00-overview.md", "# Scenario\n")
 	writeTestFile(t, root, "design/design-01-backend.md", "# Backend\n")
 
@@ -43,8 +43,14 @@ func TestFallbackDocumentsOrdersKnownPlanFiles(t *testing.T) {
 	if roles["README.md"] != "overview" {
 		t.Fatalf("README role = %q", roles["README.md"])
 	}
-	if roles["implementation-item.md"] != "implementation" {
-		t.Fatalf("implementation role = %q", roles["implementation-item.md"])
+	if roles["implementation-plan.md"] != "implementation" {
+		t.Fatalf("implementation role = %q", roles["implementation-plan.md"])
+	}
+	if docs[0].Path != "README.md" || docs[1].Path != "scenario/scenario-00-overview.md" || docs[2].Path != "design/design-01-backend.md" || docs[3].Path != "implementation-plan.md" {
+		t.Fatalf("unexpected document order: %#v", docs)
+	}
+	if docs[1].Label != "Scenario Overview" || docs[2].Label != "Backend Design" || docs[2].Track != "backend" {
+		t.Fatalf("unexpected inferred metadata: %#v", docs)
 	}
 }
 
@@ -255,11 +261,76 @@ documents:
 	if item.Status != models.StatusReview || item.MetadataSource != "plan.yaml" {
 		t.Fatalf("unexpected structured item metadata: %+v", item.ItemSummary)
 	}
-	if len(item.Documents) != 1 || item.Documents[0].Path != "README.md" {
+	if len(item.Documents) != 3 || item.Documents[0].Path != "README.md" {
 		t.Fatalf("unexpected documents: %#v", item.Documents)
 	}
 	if item.Counts.Files != 3 {
 		t.Fatalf("file count = %d, want 3", item.Counts.Files)
+	}
+}
+
+func TestMinimalPlanYAMLInfersIdentityTitleAndDocuments(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "plans/api/DI-170/README.md", "# DI-170: Custom Assortment Level 2\n\nOverview.\n")
+	writeTestFile(t, root, "plans/api/DI-170/scenario/scenario-00-overview.md", "# Scenario\n")
+	writeTestFile(t, root, "plans/api/DI-170/design/design-01-backend.md", "# Backend\n")
+	writeTestFile(t, root, "plans/api/DI-170/implementation-plan.md", "# Implementation\n")
+	writeTestFile(t, root, "plans/api/DI-170/plan.yaml", `plan:
+  status: done
+  tags:
+    - custom-assortment
+    - offer-detail
+`)
+
+	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"plans"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(data.Items))
+	}
+	item := data.Items[0]
+	if item.Scope != "api" || item.Identifier != "DI-170" || item.Title != "Custom Assortment Level 2" || item.Status != models.StatusDone {
+		t.Fatalf("unexpected inferred plan: %+v", item.ItemSummary)
+	}
+	if len(item.Tags) != 2 || item.Tags[0] != "custom-assortment" || item.Tags[1] != "offer-detail" {
+		t.Fatalf("unexpected tags: %#v", item.Tags)
+	}
+	if len(item.Documents) != 4 || item.Documents[3].Role != "implementation" {
+		t.Fatalf("unexpected inferred documents: %#v", item.Documents)
+	}
+	if item.Documents[1].Label != "Scenario Overview" || item.Documents[2].Label != "Backend Design" {
+		t.Fatalf("unexpected inferred labels: %#v", item.Documents)
+	}
+}
+
+func TestMinimalPlanYAMLAppliesSparseDocumentOverrides(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "plans/api/DI-170/README.md", "# DI-170: Example\n")
+	writeTestFile(t, root, "plans/api/DI-170/design/design-01-auto-assign.md", "# Design: Auto Assign\n")
+	writeTestFile(t, root, "plans/api/DI-170/scenario/scenario-00-overview.md", "# Scenario\n")
+	writeTestFile(t, root, "plans/api/DI-170/plan.yaml", `plan:
+  status: done
+documents:
+  - path: design/design-01-auto-assign.md
+    track: backend
+    label: Auto-Assign Enricher
+`)
+
+	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"plans"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	docs := data.Items[0].Documents
+	if len(docs) != 3 {
+		t.Fatalf("sparse override should retain inferred documents: %#v", docs)
+	}
+	if docs[2].Track != "backend" || docs[2].Label != "Auto-Assign Enricher" {
+		t.Fatalf("sparse override was not applied: %#v", docs[2])
 	}
 }
 

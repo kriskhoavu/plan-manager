@@ -6,14 +6,17 @@ import (
 	"sort"
 	"strings"
 
+	"gopkg.in/yaml.v3"
 	"plan-manager/internal/models"
 )
 
 type planYAML struct {
 	Plan struct {
 		Identifier string   `yaml:"identifier"`
+		Ticket     string   `yaml:"ticket"`
 		Title      string   `yaml:"title"`
 		Scope      string   `yaml:"scope"`
+		Service    string   `yaml:"service"`
 		Status     string   `yaml:"status"`
 		Owner      string   `yaml:"owner"`
 		Tags       []string `yaml:"tags"`
@@ -51,121 +54,34 @@ func NormalizeStatus(raw string) models.ItemStatus {
 
 func normalizeDocuments(docs []models.ItemDocument) []models.ItemDocument {
 	for i := range docs {
+		inferred := inferDocument(docs[i].Path)
 		if docs[i].ID == "" {
-			docs[i].ID = fileID(docs[i].Path)
+			docs[i].ID = inferred.ID
+		}
+		if docs[i].Role == "" {
+			docs[i].Role = inferred.Role
+		}
+		if docs[i].Track == "" {
+			docs[i].Track = inferred.Track
 		}
 		if docs[i].Label == "" {
-			docs[i].Label = labelFromPath(docs[i].Path)
+			docs[i].Label = inferred.Label
 		}
 	}
-	sort.SliceStable(docs, func(i, j int) bool { return naturalLess(docs[i].Path, docs[j].Path) })
+	sort.SliceStable(docs, func(i, j int) bool { return documentLess(docs[i], docs[j]) })
 	return docs
 }
 
-func parsePlanYAML(data string) planYAML {
+func parsePlanYAML(data string) (planYAML, error) {
 	var parsed planYAML
-	section := ""
-	var current *models.ItemDocument
-	for _, raw := range strings.Split(data, "\n") {
-		if strings.TrimSpace(raw) == "" || strings.HasPrefix(strings.TrimSpace(raw), "#") {
-			continue
-		}
-		indent := len(raw) - len(strings.TrimLeft(raw, " "))
-		line := strings.TrimSpace(raw)
-		switch line {
-		case "plan:":
-			section = "plan"
-			continue
-		case "documents:":
-			section = "documents"
-			continue
-		}
-		if section == "plan" && indent >= 2 {
-			key, value, ok := splitYAMLPair(line)
-			if !ok {
-				continue
-			}
-			switch key {
-			case "identifier", "ticket":
-				parsed.Plan.Identifier = value
-			case "title":
-				parsed.Plan.Title = value
-			case "scope", "service":
-				parsed.Plan.Scope = value
-			case "status":
-				parsed.Plan.Status = value
-			case "owner":
-				parsed.Plan.Owner = value
-			case "tags":
-				parsed.Plan.Tags = parseYAMLList(value)
-			}
-			continue
-		}
-		if section == "documents" && strings.HasPrefix(line, "- ") {
-			parsed.Documents = append(parsed.Documents, models.ItemDocument{})
-			current = &parsed.Documents[len(parsed.Documents)-1]
-			line = strings.TrimSpace(strings.TrimPrefix(line, "- "))
-			if key, value, ok := splitYAMLPair(line); ok {
-				assignDocumentField(current, key, value)
-			}
-			continue
-		}
-		if section == "documents" && current != nil && indent >= 4 {
-			if key, value, ok := splitYAMLPair(line); ok {
-				assignDocumentField(current, key, value)
-			}
-		}
+	if err := yaml.Unmarshal([]byte(data), &parsed); err != nil {
+		return planYAML{}, err
 	}
-	return parsed
-}
-
-func splitYAMLPair(line string) (string, string, bool) {
-	key, value, ok := strings.Cut(line, ":")
-	if !ok {
-		return "", "", false
+	if parsed.Plan.Identifier == "" {
+		parsed.Plan.Identifier = parsed.Plan.Ticket
 	}
-	return strings.TrimSpace(key), trimYAMLScalar(value), true
-}
-
-func trimYAMLScalar(value string) string {
-	value = strings.TrimSpace(value)
-	value = strings.Trim(value, `"'`)
-	if value == "null" {
-		return ""
+	if parsed.Plan.Scope == "" {
+		parsed.Plan.Scope = parsed.Plan.Service
 	}
-	return value
-}
-
-func parseYAMLList(value string) []string {
-	value = strings.TrimSpace(value)
-	if !strings.HasPrefix(value, "[") || !strings.HasSuffix(value, "]") {
-		if value == "" {
-			return nil
-		}
-		return []string{trimYAMLScalar(value)}
-	}
-	value = strings.TrimSuffix(strings.TrimPrefix(value, "["), "]")
-	var out []string
-	for _, item := range strings.Split(value, ",") {
-		item = trimYAMLScalar(item)
-		if item != "" {
-			out = append(out, item)
-		}
-	}
-	return out
-}
-
-func assignDocumentField(doc *models.ItemDocument, key, value string) {
-	switch key {
-	case "id":
-		doc.ID = value
-	case "role":
-		doc.Role = value
-	case "track":
-		doc.Track = value
-	case "path":
-		doc.Path = value
-	case "label":
-		doc.Label = value
-	}
+	return parsed, nil
 }

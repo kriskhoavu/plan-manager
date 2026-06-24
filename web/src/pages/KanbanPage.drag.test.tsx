@@ -20,11 +20,12 @@ const items: ItemSummary[] = [
 ];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe('Kanban card drag and drop', () => {
-  it('marks only editable cards as draggable and shows clear affordances', async () => {
+  it('marks only editable cards as draggable without rendering a drag control', async () => {
     vi.stubGlobal('fetch', boardFetchMock());
     renderPage();
     await screen.findByText('Draggable item');
@@ -32,8 +33,8 @@ describe('Kanban card drag and drop', () => {
     expect(cardFor('Draggable item')).toHaveAttribute('draggable', 'true');
     expect(cardFor('Unsorted docs')).toHaveAttribute('draggable', 'false');
     expect(cardFor('Protected docs')).toHaveAttribute('draggable', 'false');
-    expect(within(cardFor('Draggable item')).getByRole('button', { name: 'Drag card to another status' })).toHaveTextContent('Drag');
-    expect(within(cardFor('Protected docs')).getByLabelText('Card cannot be dragged')).toHaveTextContent('Fixed');
+    expect(within(cardFor('Draggable item')).queryByRole('button', { name: 'Drag card to another status' })).not.toBeInTheDocument();
+    expect(within(cardFor('Protected docs')).queryByLabelText('Card cannot be dragged')).not.toBeInTheDocument();
   });
 
   it('moves a card through the shared optimistic status path after a valid native drop', async () => {
@@ -51,7 +52,7 @@ describe('Kanban card drag and drop', () => {
     });
 
     expect(within(column('Review')).getByText('Draggable item')).toBeInTheDocument();
-    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/status'))).toHaveLength(1));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => isItemStatusUrl(url))).toHaveLength(1));
   });
 
   it('treats same-column, outside, and protected drops as no-ops', async () => {
@@ -73,7 +74,7 @@ describe('Kanban card drag and drop', () => {
       fireEvent.drop(column('Review'), { dataTransfer: protectedTransfer });
     });
 
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/status'))).toHaveLength(0);
+    expect(fetchMock.mock.calls.filter(([url]) => isItemStatusUrl(url))).toHaveLength(0);
     expect(within(column('Draft')).getByText('Draggable item')).toBeInTheDocument();
   });
 
@@ -94,7 +95,7 @@ describe('Kanban card drag and drop', () => {
     });
 
     expect(cardFor('Draggable item')).not.toHaveClass('dragging');
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/status'))).toHaveLength(0);
+    expect(fetchMock.mock.calls.filter(([url]) => isItemStatusUrl(url))).toHaveLength(0);
   });
 
   it('suppresses the click emitted immediately after a completed drag', async () => {
@@ -114,6 +115,33 @@ describe('Kanban card drag and drop', () => {
 
     expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/items/item-1')).toHaveLength(0);
     await waitFor(() => expect(within(column('Review')).getByText('Draggable item')).toBeInTheDocument());
+  });
+
+  it('allows normal preview selection after the post-drag suppression window expires', async () => {
+    const fetchMock = boardFetchMock();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(window.performance, 'now').mockReturnValue(1000);
+    renderPage();
+    await screen.findByText('Draggable item');
+
+    const dataTransfer = createDataTransfer();
+    const card = cardFor('Draggable item');
+    act(() => {
+      fireEvent.dragStart(card, { dataTransfer });
+      fireEvent.dragEnd(card, { dataTransfer });
+    });
+
+    vi.mocked(window.performance.now).mockReturnValue(1100);
+    act(() => {
+      fireEvent.click(card);
+    });
+    expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/items/item-1')).toHaveLength(0);
+
+    vi.mocked(window.performance.now).mockReturnValue(1400);
+    act(() => {
+      fireEvent.click(card);
+    });
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/items/item-1')).toHaveLength(1));
   });
 });
 
@@ -158,7 +186,11 @@ function boardFetchMock() {
     const url = String(input);
     if (url.startsWith('/api/items?')) return Promise.resolve(response(items));
     if (url === '/api/saved-filters') return Promise.resolve(response([]));
-    if (url.endsWith('/status')) {
+    if (url === '/api/items/item-1') return Promise.resolve(response({ ...items[0], documents: [], metadata: {}, counts: { files: 0 } }));
+    if (url === '/api/items/item-1/files') return Promise.resolve(response([]));
+    if (url === '/api/workspaces/workspace-1/git/status') return Promise.resolve(response({ branch: 'main', changes: [] }));
+    if (url === '/api/workspaces/workspace-1/git/branches') return Promise.resolve(response({ workspaceId: 'workspace-1', current: 'main', branches: ['main'] }));
+    if (isItemStatusUrl(url)) {
       return Promise.resolve(response({
         item: { ...items[0], status: 'review', documents: [], metadata: {}, counts: { files: 1 } },
         scannedAt: '2026-06-23T00:00:00Z'
@@ -166,6 +198,11 @@ function boardFetchMock() {
     }
     return Promise.resolve(response({}));
   });
+}
+
+function isItemStatusUrl(input: RequestInfo | URL): boolean {
+  const url = String(input);
+  return url.startsWith('/api/items/') && url.endsWith('/status');
 }
 
 function response(body: unknown): Response {

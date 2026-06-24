@@ -177,11 +177,11 @@ type ItemWorkspaceCounts struct {
 }
 
 type ItemDocument struct {
-	ID    string `json:"id" yaml:"id"`
-	Role  string `json:"role" yaml:"role"`
+	ID    string `json:"id" yaml:"id,omitempty"`
+	Role  string `json:"role" yaml:"role,omitempty"`
 	Track string `json:"track,omitempty" yaml:"track,omitempty"`
-	Path  string `json:"path" yaml:"path"`
-	Label string `json:"label" yaml:"label"`
+	Path  string `json:"path" yaml:"path,omitempty"`
+	Label string `json:"label" yaml:"label,omitempty"`
 }
 
 type FileNode struct {

@@ -1,6 +1,6 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
-import { BookmarkPlus, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, Pencil, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
@@ -15,6 +15,7 @@ import { notifyReliabilityChanged } from '../features/reliability/hooks';
 type DrawerTab = 'preview' | 'raw' | 'diff';
 type DrawerSideTab = 'info' | 'git';
 type DrawerFileOption = { id: string; path: string; label: string };
+const DRAG_CLICK_SUPPRESSION_MS = 350;
 
 export { filterPlans };
 
@@ -43,7 +44,11 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
   const [pendingItemIds, setPendingItemIds] = useState<Set<string>>(() => new Set());
   const [activeItemId, setActiveItemId] = useState('');
   const [dragTargetStatus, setDragTargetStatus] = useState<ItemStatus | ''>('');
-  const suppressPreviewItemId = useRef('');
+  const [workspaceGitStatus, setWorkspaceGitStatus] = useState<GitStatus | null>(null);
+  const [workspaceBranchCurrent, setWorkspaceBranchCurrent] = useState('');
+  const [workspaceBranchList, setWorkspaceBranchList] = useState<string[]>([]);
+  const autoBranchFilterRef = useRef<{ workspaceId: string; branch: string } | null>(null);
+  const suppressPreviewRef = useRef<{ itemId: string; until: number } | null>(null);
   const text = query;
 
   useEffect(() => {
@@ -65,19 +70,70 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
       .catch(() => setSavedFilters([]));
   }, [workspace?.id]);
 
+  useEffect(() => {
+    if (!workspace) {
+      setWorkspaceGitStatus(null);
+      setWorkspaceBranchCurrent('');
+      setWorkspaceBranchList([]);
+      autoBranchFilterRef.current = null;
+      return;
+    }
+    let active = true;
+    api.gitStatus(workspace.id)
+      .then((status) => {
+        if (active) setWorkspaceGitStatus(status);
+      })
+      .catch(() => {
+        if (active) setWorkspaceGitStatus(null);
+      });
+    api.workspaceBranches(workspace.id)
+      .then((response) => {
+        if (!active) return;
+        setWorkspaceBranchCurrent(response.current);
+        setWorkspaceBranchList(response.branches);
+      })
+      .catch(() => {
+        if (!active) return;
+        setWorkspaceBranchCurrent('');
+        setWorkspaceBranchList([]);
+      });
+    return () => { active = false; };
+  }, [workspace]);
+
   const sourceOptions = useMemo(() => sourceFacetOptions(items, workspace), [items, workspace]);
   const filteredPlans = useMemo(() => filterPlans(items, filters, text, workspace), [items, filters, text, workspace]);
   const services = useMemo(() => unique(items.map((plan) => plan.scope || 'Unknown')), [items]);
-  const branches = useMemo(() => unique(items.map((plan) => plan.branch)), [items]);
+  const indexedBranches = useMemo(() => unique(items.map((plan) => plan.branch)), [items]);
+  const currentBranch = workspaceGitStatus?.branch || workspaceBranchCurrent || workspace?.baselineBranch || 'No branch';
+  const branchOptions = useMemo(() => unique([
+    ...workspaceBranchList,
+    currentBranch,
+    workspace?.baselineBranch ?? '',
+    ...indexedBranches
+  ].filter((branch) => branch && branch !== 'No branch')), [currentBranch, indexedBranches, workspace?.baselineBranch, workspaceBranchList]);
   const authors = useMemo(() => unique(items.map((plan) => plan.author || plan.owner || 'Unknown')), [items]);
   const facetConfig: { key: FilterKey; title: string; options: FacetOption[] }[] = [
     { key: 'sources', title: 'Source', options: sourceOptions },
     { key: 'scopes', title: labels.scope, options: services.map((scope) => ({ value: scope, label: scope })) },
     { key: 'statuses', title: 'Status', options: statusOrder.map((item) => ({ value: item, label: statusLabels[item] })) },
     { key: 'authors', title: 'Authors', options: authors.map((author) => ({ value: author, label: author })) },
-    { key: 'branches', title: 'Branches', options: branches.map((branch) => ({ value: branch, label: branch })) }
+    { key: 'branches', title: 'Branches', options: branchOptions.map((branch) => ({ value: branch, label: branch })) }
   ];
-  const activeFilterCount = Object.values(filters).reduce((sum, values) => sum + values.length, 0) + (text ? 1 : 0);
+  const selectedBranchCount = filters.branches.length;
+  const selectedIsDefaultBranch = selectedBranchCount === 1 && filters.branches[0] === currentBranch;
+  const activeFilterCount = filters.sources.length
+    + filters.scopes.length
+    + filters.statuses.length
+    + filters.authors.length
+    + (selectedIsDefaultBranch ? 0 : selectedBranchCount)
+    + (text ? 1 : 0);
+  const branchFilterLabel = selectedBranchCount === 0
+    ? 'All branches'
+    : selectedIsDefaultBranch
+      ? ''
+      : selectedBranchCount === 1
+        ? `Showing: ${filters.branches[0]}`
+        : `Showing: ${selectedBranchCount}`;
   const grouped = useMemo(() => {
     const map = new Map<ItemStatus, ItemSummary[]>();
     statusOrder.forEach((item) => map.set(item, []));
@@ -85,6 +141,18 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
     return map;
   }, [filteredPlans]);
   const activeItem = activeItemId ? items.find((item) => item.id === activeItemId) : undefined;
+
+  useEffect(() => {
+    if (!workspace || !currentBranch || currentBranch === 'No branch') return;
+    setFilters((current) => {
+      const auto = autoBranchFilterRef.current;
+      const isPreviousAuto = auto?.workspaceId === workspace.id && current.branches.length === 1 && current.branches[0] === auto.branch;
+      const isNewWorkspace = auto?.workspaceId !== workspace.id;
+      if (!isNewWorkspace && !isPreviousAuto) return current;
+      autoBranchFilterRef.current = { workspaceId: workspace.id, branch: currentBranch };
+      return { ...current, branches: [currentBranch] };
+    });
+  }, [currentBranch, workspace]);
 
   const scan = async () => {
     if (!workspace) return;
@@ -141,14 +209,11 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', itemId);
     setActiveItemId(itemId);
-    suppressPreviewItemId.current = itemId;
+    suppressPreviewRef.current = { itemId, until: Number.POSITIVE_INFINITY };
   };
 
   const finishDrag = (itemId: string) => {
-    suppressPreviewItemId.current = itemId;
-    window.setTimeout(() => {
-      if (suppressPreviewItemId.current === itemId) suppressPreviewItemId.current = '';
-    }, 0);
+    suppressPreviewRef.current = { itemId, until: window.performance.now() + DRAG_CLICK_SUPPRESSION_MS };
     setActiveItemId('');
     setDragTargetStatus('');
   };
@@ -262,8 +327,19 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
             <span><FolderGit2 size={15} /> {workspace?.name ?? 'No workspace selected'}</span>
           </div>
         </div>
-        {workspace && workspace.sources.length > 0 && (
-          <div className="workspace-context" aria-label="Sources">
+        {workspace && (
+          <div className="workspace-context" aria-label="Workspace context">
+            <button
+              type="button"
+              className={selectedBranchCount > 0 && !selectedIsDefaultBranch ? 'branch-context-chip active' : 'branch-context-chip'}
+              onClick={() => setOpenFacet(openFacet === 'branches' ? '' : 'branches')}
+              aria-label={`Open Branches filter. Current branch ${currentBranch}${branchFilterLabel ? `. ${branchFilterLabel}` : ''}`}
+            >
+              <GitBranch size={14} />
+              <span>Current</span>
+              <strong>{currentBranch}</strong>
+              {branchFilterLabel && <small>{branchFilterLabel}</small>}
+            </button>
             {workspace.sources.slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>
             ))}
@@ -284,7 +360,6 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
         <button className="secondary" onClick={clearFilters} disabled={activeFilterCount === 0}>
           <X size={16} /> Clear
         </button>
-        <span className="readonly-badge"><Pencil size={15} /> Authoring</span>
         <span className="scan-state">{scanState}</span>
       </div>
       <div className="facet-bar">
@@ -349,10 +424,11 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
                   onDragStart={(event) => handleCardDragStart(event, plan.id)}
                   onDragEnd={() => handleCardDragEnd(plan.id)}
                   onPreview={() => {
-                    if (suppressPreviewItemId.current === plan.id) {
-                      suppressPreviewItemId.current = '';
+                    const suppressed = suppressPreviewRef.current;
+                    if (suppressed?.itemId === plan.id && window.performance.now() <= suppressed.until) {
                       return;
                     }
+                    suppressPreviewRef.current = null;
                     setDrawerPlanId(plan.id);
                   }}
                   onOpen={() => onOpenPlan(plan.id)}
@@ -575,22 +651,6 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
     >
       <div className="plan-card-title">
         <button type="button" className="plan-card-link plan-card-heading" onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.title}</button>
-        {draggable ? (
-          <button
-            type="button"
-            className="drag-affordance"
-            aria-label="Drag card to another status"
-            title="Drag this card to another status"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <span aria-hidden="true">⋮⋮</span>
-            Drag
-          </button>
-        ) : (
-          <span className="drag-affordance locked" aria-label="Card cannot be dragged" title="This card cannot be dragged">
-            Fixed
-          </span>
-        )}
         <span className="card-badges">
           {plan.scope && <span className="scope-badge">{plan.scope}</span>}
           {plan.scope && source && <span className="badge-separator">|</span>}

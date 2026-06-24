@@ -51,6 +51,58 @@ describe('KanbanPage', () => {
     await waitFor(() => expect(screen.getByText('Item Manager')).toBeInTheDocument());
   });
 
+  it('shows the active branch context and opens the branch filter from it', async () => {
+    const branchItems = [
+      draftItem,
+      { ...draftItem, id: 'p2', title: 'Feature item', branch: 'feature/pm-012' }
+    ];
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/items?')) return Promise.resolve(response(branchItems));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main', 'feature/pm-012', 'release/old'] }));
+      return Promise.resolve(response({}));
+    }));
+
+    render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    const branchContext = await screen.findByRole('button', { name: /Open Branches filter\. Current branch main$/ });
+    await waitFor(() => expect(screen.queryByText('Feature item')).not.toBeInTheDocument());
+    expect(screen.getByText('Drag cards')).toBeInTheDocument();
+
+    fireEvent.click(branchContext);
+
+    const featureBranchOption = screen.getByLabelText('feature/pm-012');
+    expect(featureBranchOption).toBeInTheDocument();
+    expect(screen.getByLabelText('main')).toBeInTheDocument();
+    expect(screen.getByLabelText('release/old')).toBeInTheDocument();
+    fireEvent.click(featureBranchOption);
+
+    expect(screen.getByRole('button', { name: /Open Branches filter\. Current branch main\. Showing: 2/ })).toBeInTheDocument();
+    expect(screen.getByText('Drag cards')).toBeInTheDocument();
+    expect(screen.getByText('Feature item')).toBeInTheDocument();
+  });
+
+  it('offers the current branch filter even when no indexed item is on it', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/items?')) return Promise.resolve(response([{ ...draftItem, branch: 'feature/pm-012' }]));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main', 'feature/pm-012'] }));
+      return Promise.resolve(response({}));
+    }));
+
+    render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    await waitFor(() => expect(screen.queryByText('Drag cards')).not.toBeInTheDocument());
+    fireEvent.click(await screen.findByRole('button', { name: /Open Branches filter\. Current branch main/ }));
+
+    expect(screen.getByLabelText('main')).toBeInTheDocument();
+    expect(screen.getByLabelText('feature/pm-012')).toBeInTheDocument();
+  });
+
   it('moves status optimistically and reconciles the returned item', async () => {
     const fetchMock = statusFetchMock(async () => response({
       item: { ...draftItem, status: 'review', title: 'Persisted title', documents: [], metadata: {}, counts: { files: 1 } },
@@ -92,7 +144,7 @@ describe('KanbanPage', () => {
     selectCardStatus('Review');
     selectCardStatus('Done');
 
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/status'))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => isItemStatusUrl(url))).toHaveLength(1);
     await act(async () => resolveUpdate(response({
       item: { ...draftItem, status: 'review', documents: [], metadata: {}, counts: { files: 1 } },
       scannedAt: '2026-06-23T00:00:00Z'
@@ -117,9 +169,16 @@ function statusFetchMock(updateStatus: () => Promise<Response>) {
     const url = String(input);
     if (url.startsWith('/api/items?')) return Promise.resolve(response([draftItem]));
     if (url === '/api/saved-filters') return Promise.resolve(response([]));
-    if (url.endsWith('/status')) return updateStatus();
+    if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+    if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+    if (isItemStatusUrl(url)) return updateStatus();
     return Promise.resolve(response({}));
   });
+}
+
+function isItemStatusUrl(input: RequestInfo | URL): boolean {
+  const url = String(input);
+  return url.startsWith('/api/items/') && url.endsWith('/status');
 }
 
 function response(body: unknown, ok = true, status = 200): Response {

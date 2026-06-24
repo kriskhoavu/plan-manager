@@ -62,23 +62,6 @@ func (g *GitAdapter) ListBranches(workspacePath string) ([]string, error) {
 	return branches, nil
 }
 
-func (g *GitAdapter) BranchForIdentifier(workspacePath, ticket string) string {
-	ticket = strings.ToLower(strings.TrimSpace(ticket))
-	if ticket == "" {
-		return ""
-	}
-	branches, err := g.ListBranches(workspacePath)
-	if err != nil {
-		return ""
-	}
-	for _, branch := range branches {
-		if strings.Contains(strings.ToLower(branch), ticket) {
-			return branch
-		}
-	}
-	return ""
-}
-
 func (g *GitAdapter) LastAuthor(workspacePath, relPath string) string {
 	out, err := g.run(workspacePath, "log", "-1", "--format=%an", "--", relPath)
 	if err != nil {

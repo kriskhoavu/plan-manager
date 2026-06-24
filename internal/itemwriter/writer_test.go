@@ -40,9 +40,14 @@ func TestSaveMetadataCreatesPlanYAML(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, want := range []string{"identifier: PM-002", "status: in_progress", "owner: Khoa Vu", "- items", "- edit"} {
+	for _, want := range []string{"plan:", "title: Item Editing", "status: in_progress", "owner: Khoa Vu", "- items", "- edit"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("plan.yaml missing %q:\n%s", want, text)
+		}
+	}
+	for _, redundant := range []string{"identifier:", "scope:", "documents:"} {
+		if strings.Contains(text, redundant) {
+			t.Fatalf("plan.yaml contains redundant %q:\n%s", redundant, text)
 		}
 	}
 }
@@ -53,6 +58,47 @@ func TestSaveMetadataRejectsDocsRoot(t *testing.T) {
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{ItemPath: "docs", MetadataSource: "docs"}}
 	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusDone}); err == nil {
 		t.Fatal("expected docs root metadata edit to be rejected")
+	}
+}
+
+func TestSaveMetadataCompactsLegacyPlanYAML(t *testing.T) {
+	root := t.TempDir()
+	itemRoot := filepath.Join(root, "plans", "api", "DI-170")
+	writeFile(t, itemRoot, "README.md", "# DI-170: Custom Assortment Level 2\n")
+	writeFile(t, itemRoot, "design/design-01-backend.md", "# Backend Design\n")
+	writeFile(t, itemRoot, "plan.yaml", `schemaVersion: 1
+plan:
+  ticket: DI-170
+  title: Custom Assortment Level 2
+  service: api
+  status: draft
+  owner: null
+  tags: [backend]
+  targetDate: null
+documents:
+  - id: design-backend
+    role: design
+    track: backend
+    path: design/design-01-backend.md
+    label: Backend Design
+    order: 10
+`)
+
+	writer := New(fileaccess.New(), nil, nil, nil)
+	workspace := models.WorkspaceConfig{Path: root, Sources: []string{"plans"}}
+	item := models.ItemDetail{ItemSummary: models.ItemSummary{
+		ItemPath: "plans/api/DI-170", Scope: "api", Identifier: "DI-170", Title: "Custom Assortment Level 2", Status: models.StatusDraft,
+	}}
+	if _, err := writer.SaveMetadata(workspace, item, models.ItemMetadataUpdateInput{Status: models.StatusDone}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(itemRoot, "plan.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if text != "plan:\n    status: done\n    tags:\n        - backend\n" {
+		t.Fatalf("unexpected compact plan.yaml:\n%s", text)
 	}
 }
 
@@ -95,10 +141,18 @@ func TestCreateItemWritesStarterFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, rel := range []string{"README.md", "scenario/scenario-00-overview.md", "design/design-01-backend.md", "design/design-02-frontend.md", "implementation-item.md", "plan.yaml"} {
+	for _, rel := range []string{"README.md", "scenario/scenario-00-overview.md", "design/design-01-backend.md", "design/design-02-frontend.md", "implementation-plan.md", "plan.yaml"} {
 		if _, err := os.Stat(filepath.Join(root, "items", "platform", "PM-003", filepath.FromSlash(rel))); err != nil {
 			t.Fatalf("expected %s: %v", rel, err)
 		}
+	}
+	data, err := os.ReadFile(filepath.Join(root, "items", "platform", "PM-003", "plan.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Contains(text, "identifier:") || strings.Contains(text, "scope:") || strings.Contains(text, "title:") || strings.Contains(text, "documents:") {
+		t.Fatalf("starter plan.yaml should contain only non-inferable metadata:\n%s", text)
 	}
 }
 

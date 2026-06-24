@@ -198,7 +198,17 @@ Examples:
 
 Registered workspaces are not used for app registry or cache storage. Plan Manager writes to them only when the user edits Markdown, changes metadata or status, creates an item, saves source structure settings, commits, pulls, pushes, or runs a branch operation.
 
-Each structured plan uses `plan.yaml` as its metadata source. Sources may also contain an optional `workspace-settings.yaml`. This file is owned by the workspace and describes how a non-standard source root should be split into item cards. The conceptual fields are `scope` and `identifier`; the legacy `repository-settings.yaml`, `service`, `ticket`, and `planDirectories` names are read for migration compatibility:
+Each structured plan uses a minimal `plan.yaml` as its metadata source:
+
+```yaml
+plan:
+  status: done
+  tags: [backend, frontend]
+```
+
+The scanner infers identity from the directory path, title from `README.md`, and document metadata from conventional Markdown paths. `title` is needed only when it intentionally differs from the README heading; `owner` and `tags` are optional.
+
+Sources may also contain an optional `workspace-settings.yaml`. This file is owned by the workspace and describes how a non-standard source root should be split into item cards. The conceptual fields are `scope` and `identifier`; the legacy `repository-settings.yaml`, `service`, `ticket`, and `planDirectories` names are read for migration compatibility:
 
 ```yaml
 version: 1
