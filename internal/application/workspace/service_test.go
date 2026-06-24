@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"plan-manager/internal/fileaccess"
 	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemindex"
+	"plan-manager/internal/itemwriter"
 	"plan-manager/internal/models"
 	"plan-manager/internal/registry"
 	"plan-manager/internal/scanner"
@@ -128,6 +130,47 @@ func TestSourceStructureIncludesProposalsAndPreview(t *testing.T) {
 	}
 	if len(result.Preview) != 1 || result.Preview[0].Scope != "api" || result.Preview[0].Identifier != "DI-101" || result.Preview[0].Title != "API Search" {
 		t.Fatalf("unexpected preview: %#v", result.Preview)
+	}
+}
+
+func TestResetSourceStructureRemovesSettingsAndRescans(t *testing.T) {
+	root := newWorkspaceGitRepo(t)
+	writeWorkspaceGitFile(t, root, "docs/workspace-settings.yaml", `version: 1
+cards:
+  - pathPattern: "{scope}/feature/{identifier}"
+    fields:
+      scope: "{scope}"
+      identifier: "{identifier}"
+      title: readme_heading
+      status: draft
+      tags: [docs]
+`)
+	writeWorkspaceGitFile(t, root, "docs/api/feature/DI-101/README.md", "# DI-101: API Search\n")
+	workspaceGitCommit(t, root, "configured docs")
+	dir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"docs"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := itemindex.New(filepath.Join(dir, "items.yaml"))
+	scan := scanner.New(git)
+	writer := itemwriter.New(fileaccess.New(), scan, idx, reg)
+	service := New(reg, idx, scan, writer, git)
+
+	result, err := service.ResetSourceStructure(workspace.ID, "docs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Exists {
+		t.Fatalf("expected reset result to report no settings file: %+v", result.SourceSettingsResult)
+	}
+	if _, err := os.Stat(filepath.Join(root, "docs", "workspace-settings.yaml")); !os.IsNotExist(err) {
+		t.Fatalf("settings file still exists or stat failed unexpectedly: %v", err)
+	}
+	if result.Scan.ItemCount != 1 {
+		t.Fatalf("expected scan after reset, got %+v", result.Scan)
 	}
 }
 

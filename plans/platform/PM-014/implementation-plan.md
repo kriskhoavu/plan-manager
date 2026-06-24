@@ -10,6 +10,8 @@ Add source-derived proposals and visual previews to the Source Structure configu
 |-------|--------------------------|--------|
 | B1    | Proposal And Preview API | Done   |
 | F1    | Visual Source Dialog     | Done   |
+| B2    | Reset Source Structure   | Done   |
+| F2    | Reset Dialog Action      |        |
 
 ## Terminology Lock
 
@@ -37,6 +39,21 @@ All code, fields, API params, and TS types must use:
 
 ---
 
+### Phase B2: Reset Source Structure
+
+**Deliverables:**
+
+- [x] Add a backend reset operation that removes source settings files for a source directory.
+- [x] Add a `DELETE /api/workspaces/{id}/source-structure?directory=` route.
+- [x] Rescan the workspace after reset and return the same source-structure result shape.
+- [x] Add backend tests for removing `workspace-settings.yaml` and restoring fallback behavior.
+
+**Verification:** `rtk go test ./internal/scanner ./internal/application/workspace ./internal/api`
+
+**Commit:** `PM-014: Add source structure reset API`
+
+---
+
 ## Frontend Phases
 
 ### Phase F1: Visual Source Dialog
@@ -53,6 +70,21 @@ All code, fields, API params, and TS types must use:
 **Verification:** `rtk npm test -- --run web/src/pages/WorkspacesPage.test.ts web/src/features/workspaces/sourceSettings.test.ts && rtk npm run build`
 
 **Commit:** `PM-014: Add visual source structure dialog`
+
+---
+
+### Phase F2: Reset Dialog Action
+
+**Deliverables:**
+
+- [ ] Add an API client method for resetting source structure.
+- [ ] Add a reset button in the Source Structure dialog when a settings file exists.
+- [ ] Confirm before reset and refresh the dialog state from the backend result.
+- [ ] Add frontend tests for reset client/helper behavior where practical.
+
+**Verification:** `rtk npm test -- --run web/src/pages/WorkspacesPage.test.ts && rtk npm run build`
+
+**Commit:** `PM-014: Add source structure reset action`
 
 ---
 

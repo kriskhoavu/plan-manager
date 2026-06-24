@@ -129,6 +129,16 @@ func WriteSourceStructureSettings(root string, settings models.SourceStructureSe
 	return os.WriteFile(filepath.Join(root, SourceStructureSettingsFile), data, 0o644)
 }
 
+func RemoveSourceStructureSettings(root string) error {
+	for _, name := range []string{SourceStructureSettingsFile, legacySourceStructureSettingsFile} {
+		err := os.Remove(filepath.Join(root, name))
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
+}
+
 func ValidateSourceStructureSettings(settings models.SourceStructureSettings) []models.ScanWarning {
 	var warnings []models.ScanWarning
 	if settings.Version != 1 {

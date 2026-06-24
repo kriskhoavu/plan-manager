@@ -276,6 +276,36 @@ func (s *Service) SaveSourceStructure(id, directory string, settings models.Sour
 	}, nil
 }
 
+func (s *Service) ResetSourceStructure(id, directory string) (SourceStructureSaveResult, error) {
+	root, cleanDirectory, err := s.sourceRoot(id, directory)
+	if err != nil {
+		return SourceStructureSaveResult{}, err
+	}
+	if err := scanner.RemoveSourceStructureSettings(root); err != nil {
+		return SourceStructureSaveResult{}, err
+	}
+	workspace, ok, err := s.registry.Get(id)
+	if err != nil {
+		return SourceStructureSaveResult{}, err
+	}
+	if !ok {
+		return SourceStructureSaveResult{}, apperrors.ErrWorkspaceNotFound
+	}
+	scanResult, err := s.writer.RefreshWorkspace(workspace)
+	if err != nil {
+		return SourceStructureSaveResult{}, err
+	}
+	result, err := s.SourceStructure(id, cleanDirectory)
+	if err != nil {
+		return SourceStructureSaveResult{}, err
+	}
+	result.Warnings = NonNilWarnings(scanResult.Warnings)
+	return SourceStructureSaveResult{
+		SourceSettingsResult: result,
+		Scan:                 scanResult,
+	}, nil
+}
+
 func sourceStructurePreview(root, cleanDirectory string, settings models.SourceStructureSettings) []models.SourceStructurePreview {
 	if len(settings.Cards) == 0 {
 		return []models.SourceStructurePreview{}

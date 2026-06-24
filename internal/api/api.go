@@ -94,6 +94,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/workspaces/{id}/health", a.workspaceHealth)
 	mux.HandleFunc("GET /api/workspaces/{id}/source-structure", a.getSourceStructure)
 	mux.HandleFunc("PUT /api/workspaces/{id}/source-structure", a.saveSourceStructure)
+	mux.HandleFunc("DELETE /api/workspaces/{id}/source-structure", a.resetSourceStructure)
 	mux.HandleFunc("GET /api/workspaces/{id}/tree", a.workspaceTree)
 	mux.HandleFunc("GET /api/workspaces/files/search", a.workspacePathSearch)
 	mux.HandleFunc("GET /api/workspaces/files/content-search", a.workspaceContentSearch)
@@ -383,6 +384,11 @@ func (a *API) saveSourceStructure(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := a.workspaces.SaveSourceStructure(r.PathValue("id"), r.URL.Query().Get("directory"), settings)
+	respondWorkspaceResult(w, result, err)
+}
+
+func (a *API) resetSourceStructure(w http.ResponseWriter, r *http.Request) {
+	result, err := a.workspaces.ResetSourceStructure(r.PathValue("id"), r.URL.Query().Get("directory"))
 	respondWorkspaceResult(w, result, err)
 }
 
