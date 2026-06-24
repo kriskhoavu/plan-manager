@@ -228,12 +228,16 @@ func (s *Service) SourceStructure(id, directory string) (models.SourceSettingsRe
 	if warnings == nil {
 		warnings = []models.ScanWarning{}
 	}
+	reader := scanner.NewFilesystemSourceReader(filepath.Dir(root))
+	proposals, preview := scanner.SourceStructureProposals(reader, cleanDirectory, settings)
 	return models.SourceSettingsResult{
 		Directory: cleanDirectory,
 		Exists:    exists,
 		Mode:      mode,
 		Settings:  settings,
 		Warnings:  warnings,
+		Proposals: proposals,
+		Preview:   preview,
 	}, nil
 }
 
@@ -266,9 +270,17 @@ func (s *Service) SaveSourceStructure(id, directory string, settings models.Sour
 			Mode:      scanner.SourceSettingsMode(root),
 			Settings:  settings,
 			Warnings:  NonNilWarnings(scanResult.Warnings),
+			Preview:   sourceStructurePreview(root, cleanDirectory, settings),
 		},
 		Scan: scanResult,
 	}, nil
+}
+
+func sourceStructurePreview(root, cleanDirectory string, settings models.SourceStructureSettings) []models.SourceStructurePreview {
+	if len(settings.Cards) == 0 {
+		return []models.SourceStructurePreview{}
+	}
+	return scanner.PreviewSourceStructureCard(scanner.NewFilesystemSourceReader(filepath.Dir(root)), cleanDirectory, settings.Cards[0])
 }
 
 func (s *Service) sourceRoot(id, directory string) (string, string, error) {

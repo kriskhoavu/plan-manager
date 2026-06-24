@@ -106,6 +106,31 @@ func TestLoadBranchScansSnapshotWithoutCheckout(t *testing.T) {
 	}
 }
 
+func TestSourceStructureIncludesProposalsAndPreview(t *testing.T) {
+	root := newWorkspaceGitRepo(t)
+	writeWorkspaceGitFile(t, root, "docs/api/feature/DI-101/README.md", "# DI-101: API Search\n")
+	workspaceGitCommit(t, root, "docs")
+	dir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{Name: "Workspace", Path: root, BaselineBranch: "main", Sources: []string{"docs"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := New(reg, itemindex.New(filepath.Join(dir, "items.yaml")), scanner.New(git), nil, git)
+
+	result, err := service.SourceStructure(workspace.ID, "docs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Proposals) == 0 || result.Proposals[0].ID != "scope-feature-identifier" {
+		t.Fatalf("unexpected proposals: %#v", result.Proposals)
+	}
+	if len(result.Preview) != 1 || result.Preview[0].Scope != "api" || result.Preview[0].Identifier != "DI-101" || result.Preview[0].Title != "API Search" {
+		t.Fatalf("unexpected preview: %#v", result.Preview)
+	}
+}
+
 func newWorkspaceGitRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

@@ -163,6 +163,35 @@ cards:
 	}
 }
 
+func TestSourceStructureProposalsPreviewRealPaths(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "docs/api/feature/DI-101/README.md", "# DI-101: API Search\n\nSearch docs.\n")
+	writeTestFile(t, root, "docs/web/feature/DI-202/README.md", "# Web UI\n\nUI docs.\n")
+	reader := NewFilesystemSourceReader(root)
+
+	proposals, preview := SourceStructureProposals(reader, "docs", DefaultSourceStructureSettings())
+
+	if len(proposals) < 3 {
+		t.Fatalf("expected proposal options, got %#v", proposals)
+	}
+	first := proposals[0]
+	if first.ID != "scope-feature-identifier" || first.Confidence != "high" {
+		t.Fatalf("unexpected first proposal: %#v", first)
+	}
+	if len(first.Preview) != 2 {
+		t.Fatalf("expected 2 preview rows, got %#v", first.Preview)
+	}
+	if first.Preview[0].Path != "docs/api/feature/DI-101" || first.Preview[0].Scope != "api" || first.Preview[0].Identifier != "DI-101" || first.Preview[0].Title != "API Search" {
+		t.Fatalf("unexpected preview row: %#v", first.Preview[0])
+	}
+	if len(first.Preview[0].Tags) != 2 || first.Preview[0].Tags[0] != "docs" || first.Preview[0].Tags[1] != "api" {
+		t.Fatalf("unexpected preview tags: %#v", first.Preview[0].Tags)
+	}
+	if len(preview) != 2 {
+		t.Fatalf("expected current settings preview, got %#v", preview)
+	}
+}
+
 func TestInvalidSourceStructureSettingsFallsBackToDocsCollection(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "docs/workspace-settings.yaml", `version: 1

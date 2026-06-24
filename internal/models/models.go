@@ -151,12 +151,32 @@ type SourceStructureFields struct {
 	Tags       []string `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
+type SourceStructureProposal struct {
+	ID         string                   `json:"id" yaml:"id"`
+	Label      string                   `json:"label" yaml:"label"`
+	Summary    string                   `json:"summary" yaml:"summary"`
+	Confidence string                   `json:"confidence" yaml:"confidence"`
+	Card       SourceStructureCard      `json:"card" yaml:"card"`
+	Preview    []SourceStructurePreview `json:"preview" yaml:"preview"`
+}
+
+type SourceStructurePreview struct {
+	Path       string     `json:"path" yaml:"path"`
+	Scope      string     `json:"scope" yaml:"scope"`
+	Identifier string     `json:"identifier" yaml:"identifier"`
+	Title      string     `json:"title" yaml:"title"`
+	Status     ItemStatus `json:"status" yaml:"status"`
+	Tags       []string   `json:"tags" yaml:"tags"`
+}
+
 type SourceSettingsResult struct {
-	Directory string                  `json:"directory" yaml:"directory"`
-	Exists    bool                    `json:"exists" yaml:"exists"`
-	Mode      string                  `json:"mode" yaml:"mode"`
-	Settings  SourceStructureSettings `json:"settings" yaml:"settings"`
-	Warnings  []ScanWarning           `json:"warnings" yaml:"warnings"`
+	Directory string                    `json:"directory" yaml:"directory"`
+	Exists    bool                      `json:"exists" yaml:"exists"`
+	Mode      string                    `json:"mode" yaml:"mode"`
+	Settings  SourceStructureSettings   `json:"settings" yaml:"settings"`
+	Warnings  []ScanWarning             `json:"warnings" yaml:"warnings"`
+	Proposals []SourceStructureProposal `json:"proposals" yaml:"proposals"`
+	Preview   []SourceStructurePreview  `json:"preview" yaml:"preview"`
 }
 
 type ItemSummary struct {
