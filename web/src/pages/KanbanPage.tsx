@@ -1,6 +1,6 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
-import { BookmarkPlus, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GripVertical, Info, KanbanSquare, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, Check, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GitCommitHorizontal, GripVertical, Info, KanbanSquare, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
@@ -50,6 +50,8 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
   const [selectedBranch, setSelectedBranch] = useState('');
   const [branchContext, setBranchContext] = useState<BranchLoadResult | null>(null);
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
+  const [branchSearch, setBranchSearch] = useState('');
+  const branchPickerRef = useRef<HTMLDivElement | null>(null);
   const suppressPreviewRef = useRef<{ itemId: string; until: number } | null>(null);
   const text = query;
 
@@ -63,6 +65,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
       setSelectedBranch(result.branch);
       setPlans(result.items);
       setBranchMenuOpen(false);
+      setBranchSearch('');
     } catch (err) {
       try {
         const fallbackItems = await api.items(new URLSearchParams({ workspaceId: workspace.id }));
@@ -71,6 +74,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
         setPlans(fallbackItems);
         setError('');
         setBranchMenuOpen(false);
+        setBranchSearch('');
       } catch {
         setError(err instanceof Error ? err.message : 'Failed to load branch snapshot');
         setPlans([]);
@@ -86,11 +90,34 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
       setBranchContext(null);
       setSelectedBranch('');
       setBranchMenuOpen(false);
+      setBranchSearch('');
       setLoading(false);
       return;
     }
     void loadBranch(workspace.lastSelectedBranch || workspace.baselineBranch, false);
   }, [workspace?.id, refreshKey]);
+
+  useEffect(() => {
+    if (!branchMenuOpen) return;
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (branchPickerRef.current?.contains(event.target as Node | null)) return;
+      setBranchMenuOpen(false);
+      setBranchSearch('');
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setBranchMenuOpen(false);
+      setBranchSearch('');
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [branchMenuOpen]);
 
   useEffect(() => {
     api.savedFilters()
@@ -137,6 +164,12 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
     workspace?.baselineBranch ?? '',
     selectedBranch
   ].filter((branch) => branch && branch !== 'No branch')), [currentBranch, selectedBranch, workspace?.baselineBranch, workspaceBranchList]);
+  const filteredBranchOptions = useMemo(() => {
+    const search = branchSearch.trim().toLowerCase();
+    const pinned = branchOptions.filter((branch) => isPrimaryBranch(branch));
+    const matched = branchOptions.filter((branch) => !search || branch.toLowerCase().includes(search));
+    return orderBranchOptions(unique([...pinned, ...matched]));
+  }, [branchOptions, branchSearch]);
   const authors = useMemo(() => unique(items.map((plan) => plan.author || plan.owner || 'Unknown')), [items]);
   const facetConfig: { key: FilterKey; title: string; options: FacetOption[] }[] = [
     { key: 'sources', title: 'Source', options: sourceOptions },
@@ -288,11 +321,6 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
     });
   };
 
-  const clearFilters = () => {
-    setFilters(emptyFilters);
-    setQuery('');
-  };
-
   const saveCurrentFilter = async () => {
     if (!saveFilterName.trim()) return;
     const saved = await api.saveFilter({
@@ -345,37 +373,60 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
             <div className={sourceMode === 'snapshot' ? 'branch-context-chip active' : 'branch-context-chip'}>
               <GitBranch size={14} />
               <span>Branch</span>
-              <div className="branch-selector-wrap">
+              <div className="branch-selector-wrap" ref={branchPickerRef}>
                 <button
                   type="button"
                   className="branch-picker-trigger"
                   aria-label="Select Kanban branch"
                   aria-haspopup="listbox"
                   aria-expanded={branchMenuOpen}
-                  onClick={() => setBranchMenuOpen((open) => !open)}
+                  onClick={() => {
+                    setBranchMenuOpen((open) => !open);
+                    setBranchSearch('');
+                  }}
                 >
                   <span>{selectedBranch || currentBranch}</span>
                   <ChevronDown size={14} />
                 </button>
                 {branchMenuOpen && (
-                  <div className="branch-picker-menu" role="listbox" aria-label="Kanban branches">
-                    {branchOptions.map((branch) => (
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={branch === (selectedBranch || currentBranch)}
-                        key={branch}
-                        onClick={() => void loadBranch(branch, false)}
-                      >
-                        {branch}
-                      </button>
-                    ))}
+                  <div className="branch-picker-menu">
+                    <label className="branch-picker-search">
+                      <Search size={14} />
+                      <input
+                        value={branchSearch}
+                        onChange={(event) => setBranchSearch(event.target.value)}
+                        placeholder="Search branches..."
+                        aria-label="Search branches"
+                        autoFocus
+                      />
+                    </label>
+                    <div className="branch-picker-options" role="listbox" aria-label="Kanban branches">
+                      {filteredBranchOptions.map((branch) => (
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={branch === (selectedBranch || currentBranch)}
+                          key={branch}
+                          title={branch === currentBranch ? 'Current checkout branch' : undefined}
+                          onClick={() => void loadBranch(branch, false)}
+                        >
+                          <span className="branch-option-checkout-slot">
+                            {branch === currentBranch && <GitCommitHorizontal className="branch-option-checkout" size={14} aria-hidden="true" />}
+                          </span>
+                          <span className="branch-option-icon-slot">
+                            {branch === (selectedBranch || currentBranch) && <Check className="branch-option-check" size={14} aria-hidden="true" />}
+                          </span>
+                          <span className="branch-option-label">{branch}</span>
+                        </button>
+                      ))}
+                      {filteredBranchOptions.length === 0 && <span className="branch-picker-empty">No branches found</span>}
+                    </div>
                   </div>
                 )}
               </div>
-              <small title={sourceMode === 'snapshot' ? `Snapshot; writes copy into ${currentBranch}` : 'Working tree'}>
-                {sourceMode === 'snapshot' ? `snapshot -> ${currentBranch}` : 'working tree'}
-              </small>
+              {sourceMode === 'snapshot' && (
+                <small title={`Snapshot; writes copy into ${currentBranch}`}>snapshot {'->'} {currentBranch}</small>
+              )}
             </div>
             {workspace.sources.slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>
@@ -394,9 +445,6 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
         <button className="primary" onClick={() => setNewPlanOpen(true)} disabled={sourceMode === 'snapshot'}>
           + New Item
         </button>
-        <button className="secondary" onClick={clearFilters} disabled={activeFilterCount === 0}>
-          <X size={16} /> Clear
-        </button>
         <span className="scan-state">{scanState}</span>
       </div>
       <div className="facet-bar">
@@ -408,6 +456,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
             selected={filters[facet.key]}
             open={openFacet === facet.key}
             onOpen={() => setOpenFacet(openFacet === facet.key ? '' : facet.key)}
+            onClose={() => setOpenFacet('')}
             onToggle={(value) => toggleFilter(facet.key, value)}
             onClear={() => setFilters((current) => ({ ...current, [facet.key]: [] }))}
           />
@@ -524,12 +573,13 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
   );
 }
 
-function FacetMenu({ title, options, selected, open, onOpen, onToggle, onClear }: {
+function FacetMenu({ title, options, selected, open, onOpen, onClose, onToggle, onClear }: {
   title: string;
   options: FacetOption[];
   selected: string[];
   open: boolean;
   onOpen: () => void;
+  onClose: () => void;
   onToggle: (value: string) => void;
   onClear: () => void;
 }) {
@@ -542,12 +592,20 @@ function FacetMenu({ title, options, selected, open, onOpen, onToggle, onClear }
     if (!open) return;
     const closeOnOutsideClick = (event: PointerEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onOpen();
+        onClose();
       }
     };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      onClose();
+    };
     document.addEventListener('pointerdown', closeOnOutsideClick);
-    return () => document.removeEventListener('pointerdown', closeOnOutsideClick);
-  }, [onOpen, open]);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [onClose, open]);
 
   if (visibleOptions.length === 0) return null;
   return (
@@ -669,6 +727,10 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
 }) {
   const source = sourceLabel(plan, workspace);
   const docs = plan.metadataSource === 'docs';
+  const showScope = Boolean(plan.scope && (!docs || plan.scope !== source));
+  const showIdentifier = !docs || plan.identifier.toLowerCase() !== plan.title.toLowerCase();
+  const description = docs ? plan.description : plan.description || plan.identifier;
+  const tags = docs ? plan.tags.filter((tag) => tag !== source && tag !== plan.scope && tag !== plan.identifier) : plan.tags;
   const draggable = isItemDraggable(plan) && !pending;
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -699,19 +761,19 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
       <div className="plan-card-title">
         <button type="button" className="plan-card-link plan-card-heading" onPointerDown={(event) => event.stopPropagation()} onClick={navigate}>{plan.title}</button>
         <span className="card-badges">
-          {plan.scope && <span className="scope-badge">{plan.scope}</span>}
-          {plan.scope && source && <span className="badge-separator">|</span>}
+          {showScope && <span className="scope-badge">{plan.scope}</span>}
+          {showScope && source && <span className="badge-separator">|</span>}
           {source && <span className={docs ? 'source-badge docs' : 'source-badge'}>{source}</span>}
         </span>
       </div>
-      <span className="plan-card-identifier">{plan.identifier}</span>
-      <p>{plan.description || plan.identifier}</p>
+      {showIdentifier && <span className="plan-card-identifier">{plan.identifier}</span>}
+      {description && <p>{description}</p>}
       <footer>
         <span className="avatar">{(plan.author || plan.owner || '?').slice(0, 1).toUpperCase()}</span>
         <span>{plan.author || plan.owner || 'Unknown'}</span>
         <time>{plan.updatedAt ? new Date(plan.updatedAt).toLocaleDateString() : 'No date'}</time>
       </footer>
-      {plan.tags.length > 0 && <div className="tags">{plan.tags.slice(0, 3).map((tag: string) => <span key={tag}>{tag}</span>)}</div>}
+      {tags.length > 0 && <div className="tags">{tags.slice(0, 3).map((tag: string) => <span key={tag}>{tag}</span>)}</div>}
       {plan.status !== 'unsorted' && plan.metadataSource !== 'docs' && (
         <StatusMenu value={plan.status} onChange={onMove} ariaLabel="Move item status" />
       )}
@@ -1260,6 +1322,20 @@ function operationErrorMessage(caught: unknown, fallback: string) {
   const message = caught instanceof Error ? caught.message : fallback;
   const hint = caught instanceof ApiError ? caught.recoveryHint : '';
   return [message, hint].filter(Boolean).join(' ');
+}
+
+function isPrimaryBranch(branch: string): boolean {
+  const normalized = branch.toLowerCase();
+  return normalized === 'main' || normalized === 'master';
+}
+
+function orderBranchOptions(values: string[]): string[] {
+  return [...values].sort((a, b) => {
+    const primaryRank = (branch: string) => branch.toLowerCase() === 'main' ? 0 : branch.toLowerCase() === 'master' ? 1 : 2;
+    const rankDiff = primaryRank(a) - primaryRank(b);
+    if (rankDiff !== 0) return rankDiff;
+    return a.localeCompare(b);
+  });
 }
 
 function unique(values: string[]): string[] {
