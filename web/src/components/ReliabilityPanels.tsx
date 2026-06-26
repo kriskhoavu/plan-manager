@@ -1,19 +1,35 @@
-import { Activity, AlertTriangle, CheckCircle2, CircleX, RefreshCw } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Circle, CircleX, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
 import { useAuditEvents, useWorkspaceHealth } from '../features/reliability/hooks';
 
 export function WorkspaceHealthPanel({ workspaceId }: { workspaceId: string }) {
   const { health, loading, error, refresh } = useWorkspaceHealth(workspaceId);
+  const [collapsed, setCollapsed] = useState(true);
+  const healthStatus = loading ? undefined : error ? 'failed' : health?.summary;
+
   return (
     <section className="health-panel" aria-label="Workspace health">
       <header>
-        <span><HealthIcon status={health?.summary} /> Health</span>
+        <button
+          className="health-toggle"
+          type="button"
+          onClick={() => setCollapsed((value) => !value)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand workspace health' : 'Collapse workspace health'}
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          <span className={`health-summary-icon ${healthStatus ?? 'idle'}`}>
+            <HealthIcon status={healthStatus} />
+          </span>
+          <span>Health</span>
+        </button>
         <button className="icon-button" type="button" onClick={() => void refresh()} aria-label="Refresh workspace health" title="Refresh health">
           <RefreshCw size={14} />
         </button>
       </header>
-      {loading && <span className="reliability-muted">Checking workspace...</span>}
-      {!loading && error && <span className="error">{error}</span>}
-      {!loading && health && (
+      {!collapsed && loading && <span className="reliability-muted">Checking workspace...</span>}
+      {!collapsed && !loading && error && <span className="error">{error}</span>}
+      {!collapsed && !loading && health && (
         <div className="health-checks">
           {health.checks.map((check) => (
             <div className={`health-check ${check.status}`} key={check.name} title={check.recoveryHint || check.message}>
@@ -57,6 +73,7 @@ export function ActivityPanel({ workspaceId, onClose }: { workspaceId?: string; 
 }
 
 function HealthIcon({ status }: { status?: string }) {
+  if (!status) return <Circle size={14} />;
   if (status === 'failed') return <CircleX size={14} />;
   if (status === 'warning') return <AlertTriangle size={14} />;
   return <CheckCircle2 size={14} />;

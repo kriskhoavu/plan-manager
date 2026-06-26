@@ -73,7 +73,7 @@ describe('settingsEditorFromResult', () => {
       warnings: [],
       proposals: [{
         id: 'actual-identifier',
-        label: 'Top-level folders',
+        label: 'Item folders',
         summary: 'Creates 1 card, for example docs/a12.',
         confidence: 'high',
         card: {

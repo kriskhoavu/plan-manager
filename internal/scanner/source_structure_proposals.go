@@ -275,7 +275,7 @@ func proposalIDFromPattern(pattern string) string {
 func proposalLabelFromPattern(pattern string) string {
 	switch pattern {
 	case "{item}":
-		return "Top-level folders"
+		return "Item folders"
 	case "{folder}/{item}":
 		return "Nested item folders"
 	case "{folder}/feature/{item}":

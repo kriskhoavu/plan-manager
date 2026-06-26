@@ -33,7 +33,7 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
   workspaces: WorkspaceConfig[];
   location?: ExplorerLocation;
   onLocationChange: (location?: ExplorerLocation) => void;
-  onOpenKanban: (workspace: WorkspaceConfig) => void;
+  onOpenKanban: (workspace: WorkspaceConfig, itemId?: string) => void;
 }) {
   const explorer = useWorkspaceExplorer(workspaces, location, onLocationChange);
   const [tab, setTab] = useState<EditorTab>('preview');
@@ -42,7 +42,7 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
   const [recoveryHint, setRecoveryHint] = useState('');
   const [revertOpen, setRevertOpen] = useState(false);
   const [reverting, setReverting] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [leftWidth, setLeftWidth] = useState(() => boundedNumber(localStorage.getItem('workspaceExplorer.leftWidth'), 340));
   const [rightWidth, setRightWidth] = useState(() => boundedNumber(localStorage.getItem('workspaceExplorer.rightWidth'), 300));
   const [searchIndex, setSearchIndex] = useState(0);
@@ -312,7 +312,7 @@ export function WorkspaceExplorerPage({ workspaces, location, onLocationChange, 
           {tab === 'diff' && <ExplorerDiff diff={diff} onRevert={() => setRevertOpen(true)} disabled={!editor.file || reverting} />}
         </main>
         <aside className={inspectorOpen ? 'explorer-inspector' : 'explorer-inspector collapsed'}>
-          <div className="panel-header"><h2>Inspector</h2><button className="icon-button" onClick={() => setInspectorOpen((value) => !value)}>{inspectorOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}</button></div>
+          <div className="panel-header"><h2>Inspector</h2><button className="icon-button" type="button" aria-label={inspectorOpen ? 'Collapse inspector' : 'Expand inspector'} onClick={() => setInspectorOpen((value) => !value)}>{inspectorOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}</button></div>
           {inspectorOpen && <ExplorerInspector workspace={workspace} row={selectedRow} file={editor.file} onOpenKanban={onOpenKanban} />}
           {inspectorOpen && <button className="explorer-resize-handle right" aria-label="Resize inspector" onPointerDown={(event) => startResize('right', event)} />}
         </aside>
@@ -373,7 +373,7 @@ function ExplorerDiff({ diff, onRevert, disabled }: { diff: string; onRevert: ()
   return <section className="diff-panel"><header className="diff-toolbar"><strong>{files.length ? `${files.length} changed file` : 'No local changes'}</strong><button className="danger-action" disabled={disabled || !diff} onClick={onRevert}><RotateCcw size={15} /> Revert File</button></header><pre className="diff-view">{diff || 'No local changes.'}</pre></section>;
 }
 
-function ExplorerInspector({ workspace, row, file, onOpenKanban }: { workspace?: WorkspaceConfig; row?: VisibleExplorerRow; file: ReturnType<typeof useFileEditorSession>['file']; onOpenKanban: (workspace: WorkspaceConfig) => void }) {
+function ExplorerInspector({ workspace, row, file, onOpenKanban }: { workspace?: WorkspaceConfig; row?: VisibleExplorerRow; file: ReturnType<typeof useFileEditorSession>['file']; onOpenKanban: (workspace: WorkspaceConfig, itemId?: string) => void }) {
   const [git, setGit] = useState<GitStatus | null>(null);
   const [health, setHealth] = useState<WorkspaceHealth | null>(null);
   const [item, setItem] = useState<ItemSummary | null>(null);
@@ -389,7 +389,7 @@ function ExplorerInspector({ workspace, row, file, onOpenKanban }: { workspace?:
   }, [row?.item?.itemId]);
   if (!workspace) return <p className="explorer-empty">Select a workspace or file.</p>;
   return <div className="inspector-content">
-    <section><h3>Workspace</h3><dl><dt>Name</dt><dd>{workspace.name}</dd><dt>Branch</dt><dd>{git?.branch ?? workspace.baselineBranch}</dd><dt>Health</dt><dd>{health?.summary ?? 'Loading'}</dd><dt>Changes</dt><dd>{git?.changes.length ?? 0}</dd></dl><button className="secondary" onClick={() => onOpenKanban(workspace)}><KanbanSquare size={15} /> Open Kanban</button></section>
+    <section><h3>Workspace</h3><dl><dt>Name</dt><dd>{workspace.name}</dd><dt>Branch</dt><dd>{git?.branch ?? workspace.baselineBranch}</dd><dt>Health</dt><dd>{health?.summary ?? 'Loading'}</dd><dt>Changes</dt><dd>{git?.changes.length ?? 0}</dd></dl><button className="secondary" onClick={() => onOpenKanban(workspace, row?.item?.itemId)}><KanbanSquare size={15} /> Open Kanban</button></section>
     {file && <section><h3>File</h3><dl><dt>Path</dt><dd>{file.path}</dd><dt>Kind</dt><dd>{file.kind}</dd><dt>Size</dt><dd>{file.sizeBytes.toLocaleString()} bytes</dd><dt>Editable</dt><dd>{file.editable ? 'Text' : 'Read only'}</dd></dl></section>}
     {row?.item && <section><h3>Item</h3><dl><dt>ID</dt><dd>{row.item.identifier}</dd><dt>Title</dt><dd>{row.item.title}</dd><dt>Status</dt><dd>{row.item.status}</dd><dt>Owner</dt><dd>{item?.owner || 'Unassigned'}</dd></dl><a className="secondary button-link" href={`/items/${encodeURIComponent(row.item.itemId)}`}>Open details</a></section>}
   </div>;

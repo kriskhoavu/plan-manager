@@ -19,6 +19,8 @@ describe('routeFromLocation', () => {
   it('parses retained top-level routes', () => {
     window.history.pushState(null, '', '/workspaces');
     expect(routeFromLocation()).toEqual({ name: 'workspaces' });
+    window.history.pushState(null, '', '/settings');
+    expect(routeFromLocation()).toEqual({ name: 'settings' });
   });
 
   it('defaults unknown paths to kanban', () => {

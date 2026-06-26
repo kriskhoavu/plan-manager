@@ -10,7 +10,9 @@ describe('router', () => {
 
   it('builds paths for routes', () => {
     expect(pathForRoute({ name: 'kanban' })).toBe('/kanban');
+    expect(pathForRoute({ name: 'kanban', focusedItemId: 'item 1' })).toBe('/kanban?itemId=item+1');
     expect(pathForRoute({ name: 'workspaces' })).toBe('/workspaces');
+    expect(pathForRoute({ name: 'settings' })).toBe('/settings');
     expect(pathForRoute({ name: 'workspace', itemId: 'PM-003 Architecture' })).toBe('/items/PM-003%20Architecture');
     expect(pathForRoute({ name: 'explorer', location: { workspaceId: 'workspace one', path: 'plans/PM-007' } }))
       .toBe('/explorer?workspaceId=workspace+one&path=plans%2FPM-007');
@@ -21,6 +23,10 @@ describe('router', () => {
     expect(routeFromLocation()).toEqual({ name: 'kanban' });
     window.history.pushState(null, '', '/branches');
     expect(routeFromLocation()).toEqual({ name: 'kanban' });
+    window.history.pushState(null, '', '/kanban?itemId=item-1');
+    expect(routeFromLocation()).toEqual({ name: 'kanban', focusedItemId: 'item-1' });
+    window.history.pushState(null, '', '/settings');
+    expect(routeFromLocation()).toEqual({ name: 'settings' });
   });
 
   it('parses and builds explorer selections', () => {

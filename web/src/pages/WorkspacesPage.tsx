@@ -3,16 +3,20 @@ import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, 
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { api } from '../lib/api';
-import type { WorkspaceConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult } from '../lib/types';
+import type { WorkspaceConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
-import type { SourceStructureSegmentRole } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
 export { applySegmentRole, inferCompatibilityFields, normalizeDroppedPath, parseSources, previewPathSegments };
 
 const DEFAULT_SOURCES = ['docs', 'plans'];
 const UNSORTED_SELECTION_ID = 'unsorted';
+type WorkspaceNotice = {
+  tone: 'success' | 'error' | 'info';
+  title: string;
+  details?: string[];
+};
 type SettingsEditorState = {
   repo: WorkspaceConfig;
   directory: string;
@@ -31,7 +35,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [path, setPath] = useState('');
   const [baselineBranch, setBaselineBranch] = useState('main');
   const [sources, setSources] = useState('');
-  const [message, setMessage] = useState('');
+  const [notice, setNotice] = useState<WorkspaceNotice | null>(null);
   const [busy, setBusy] = useState(false);
   const [pathDragging, setPathDragging] = useState(false);
   const [editingId, setEditingId] = useState('');
@@ -42,7 +46,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    setMessage('');
+    setNotice(null);
     try {
       await api.createWorkspace({
         name,
@@ -50,14 +54,14 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
         baselineBranch,
         sources: parseSources(sources)
       });
-      setMessage('Workspace registered');
+      setNotice({ tone: 'success', title: 'Workspace registered', details: [name || 'New workspace'] });
       setName('');
       setPath('');
       setBaselineBranch('main');
       setSources('');
       onChanged();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Registration failed');
+      setNotice({ tone: 'error', title: 'Registration failed', details: [errorMessage(err)] });
     } finally {
       setBusy(false);
     }
@@ -65,14 +69,45 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 
   const scan = async (repo: WorkspaceConfig) => {
     setBusy(true);
-    setMessage(`Scanning ${repo.name}`);
+    setNotice({ tone: 'info', title: `Scanning ${repo.name}` });
     try {
       const result = await api.scan(repo.id);
       notifyReliabilityChanged();
-      setMessage(`${result.itemCount} items indexed`);
+      setNotice(scanNotice(repo, result));
       onChanged();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Scan failed');
+      setNotice({ tone: 'error', title: `Scan failed for ${repo.name}`, details: [errorMessage(err)] });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const scanAll = async () => {
+    if (workspaces.length === 0) return;
+    setBusy(true);
+    setNotice({ tone: 'info', title: `Scanning ${workspaces.length} workspace${workspaces.length === 1 ? '' : 's'}` });
+    const details: string[] = [];
+    let failures = 0;
+    try {
+      for (const repo of workspaces) {
+        try {
+          const result = await api.scan(repo.id);
+          details.push(scanSummary(repo, result));
+          scanWarnings(result).slice(0, 2).forEach((warning) => {
+            details.push(`${repo.name} warning${warning.itemPath ? ` (${warning.itemPath})` : ''}: ${warning.message}`);
+          });
+        } catch (err) {
+          failures += 1;
+          details.push(`${repo.name}: ${errorMessage(err)}`);
+        }
+      }
+      notifyReliabilityChanged();
+      setNotice({
+        tone: failures > 0 ? 'error' : 'success',
+        title: failures > 0 ? `Scan finished with ${failures} failure${failures === 1 ? '' : 's'}` : 'All workspaces scanned',
+        details
+      });
+      await onChanged();
     } finally {
       setBusy(false);
     }
@@ -86,12 +121,12 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       baselineBranch: repo.baselineBranch,
       sources: repo.sources.join(', ')
     });
-    setMessage('');
+    setNotice(null);
   };
 
   const saveEdit = async (repo: WorkspaceConfig) => {
     setBusy(true);
-    setMessage('');
+    setNotice(null);
     try {
       await api.updateWorkspace(repo.id, {
         name: editDraft.name,
@@ -100,10 +135,10 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
         sources: parseSources(editDraft.sources)
       });
       setEditingId('');
-      setMessage('Workspace updated');
+      setNotice({ tone: 'success', title: 'Workspace updated', details: [editDraft.name || repo.name] });
       onChanged();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Update failed');
+      setNotice({ tone: 'error', title: `Update failed for ${repo.name}`, details: [errorMessage(err)] });
     } finally {
       setBusy(false);
     }
@@ -111,14 +146,14 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 
   const removeRepo = async (repo: WorkspaceConfig) => {
     setBusy(true);
-    setMessage('');
+    setNotice(null);
     try {
       await api.deleteWorkspace(repo.id);
       setEditingId('');
-      setMessage('Workspace removed');
+      setNotice({ tone: 'success', title: 'Workspace removed', details: [repo.name] });
       onChanged();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Remove failed');
+      setNotice({ tone: 'error', title: `Remove failed for ${repo.name}`, details: [errorMessage(err)] });
     } finally {
       setBusy(false);
       setRepoToRemove(null);
@@ -127,7 +162,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 
   const browsePath = async () => {
     setBusy(true);
-    setMessage('');
+    setNotice(null);
     try {
       const selection = await api.selectDirectory();
       setPath(selection.path);
@@ -135,7 +170,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
         setName(lastPathSegment(selection.path));
       }
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Directory selection failed');
+      setNotice({ tone: 'error', title: 'Directory selection failed', details: [errorMessage(err)] });
     } finally {
       setBusy(false);
     }
@@ -143,11 +178,11 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 
   const revealPath = async (targetPath: string) => {
     setBusy(true);
-    setMessage('');
+    setNotice(null);
     try {
       await api.openPath(targetPath);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Path failed to open');
+      setNotice({ tone: 'error', title: 'Path failed to open', details: [errorMessage(err)] });
     } finally {
       setBusy(false);
     }
@@ -155,12 +190,12 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
 
   const openSourceSettings = async (repo: WorkspaceConfig, directory: string) => {
     setBusy(true);
-    setMessage('');
+    setNotice(null);
     try {
       const result = await api.sourceStructure(repo.id, directory);
       setSettingsEditor(settingsEditorFromResult(repo, directory, result));
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Settings failed to load');
+      setNotice({ tone: 'error', title: 'Settings failed to load', details: [errorMessage(err)] });
     } finally {
       setBusy(false);
     }
@@ -169,15 +204,15 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const saveSourceSettings = async () => {
     if (!settingsEditor) return;
     setBusy(true);
-    setMessage('');
+    setNotice(null);
     try {
       if (settingsEditor.selectedProposalId === UNSORTED_SELECTION_ID) {
         if (settingsEditor.exists) {
           const result = await api.resetSourceStructure(settingsEditor.repo.id, settingsEditor.directory);
-          setMessage(`Source structure reset; ${result.scan?.itemCount ?? 0} items indexed`);
+          setNotice(sourceSettingsNotice('Source structure reset', settingsEditor.repo, result.scan));
         } else {
           const result = await api.scan(settingsEditor.repo.id);
-          setMessage(`Source kept unsorted; ${result.itemCount} items indexed`);
+          setNotice(scanNotice(settingsEditor.repo, result, 'Source kept unsorted'));
         }
         notifyReliabilityChanged();
         setSettingsEditor(null);
@@ -191,10 +226,10 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       const result = await api.saveSourceStructure(settingsEditor.repo.id, settingsEditor.directory, settings);
       notifyReliabilityChanged();
       setSettingsEditor(null);
-      setMessage(`Source structure saved; ${result.scan?.itemCount ?? 0} items indexed`);
+      setNotice(sourceSettingsNotice('Source structure saved', settingsEditor.repo, result.scan));
       await onChanged();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Settings failed to save');
+      setNotice({ tone: 'error', title: 'Settings failed to save', details: [errorMessage(err)] });
     } finally {
       setBusy(false);
     }
@@ -205,16 +240,16 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     const confirmed = window.confirm(`Reset Source Items for ${settingsEditor.directory}? This removes workspace-settings.yaml and scans the source again.`);
     if (!confirmed) return;
     setBusy(true);
-    setMessage('');
+    setNotice(null);
     try {
       const { repo, directory } = settingsEditor;
       const result = await api.resetSourceStructure(repo.id, directory);
       notifyReliabilityChanged();
       setSettingsEditor(settingsEditorFromResult(repo, directory, result));
-      setMessage(`Source structure reset; ${result.scan?.itemCount ?? 0} items indexed`);
+      setNotice(sourceSettingsNotice('Source structure reset', repo, result.scan));
       await onChanged();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Settings reset failed');
+      setNotice({ tone: 'error', title: 'Settings reset failed', details: [errorMessage(err)] });
     } finally {
       setBusy(false);
     }
@@ -231,7 +266,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       }
       return;
     }
-    setMessage('Drop a folder path or file URL');
+    setNotice({ tone: 'error', title: 'Drop a folder path or file URL' });
   };
 
   return (
@@ -275,7 +310,6 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             <SourcesField value={sources} onChange={setSources} />
           </div>
           <button className="primary repo-submit" disabled={busy}><FolderGit2 size={16} /> Register Workspace</button>
-          {message && <p className={message.includes('failed') || message.includes('invalid') || message.includes('cancelled') ? 'error' : 'success'}>{message}</p>}
         </form>
 
         <div className="repo-list-panel">
@@ -284,11 +318,18 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
               <h2>Registered</h2>
               <span>{workspaces.length} workspaces</span>
             </div>
+            <button className="secondary" type="button" onClick={() => void scanAll()} disabled={busy || workspaces.length === 0}>
+              <RotateCw size={16} /> Scan all
+            </button>
           </header>
+          {notice && <WorkspaceNoticePanel notice={notice} onDismiss={() => setNotice(null)} />}
           <div className="repo-list">
             {workspaces.map((repo) => (
               <article className="repo-row" key={repo.id}>
-                <div className="repo-row-icon"><HardDrive size={18} /></div>
+                <div className="repo-row-icon">
+                  <HardDrive size={18} />
+                  <span className="repo-baseline-badge" title={`Baseline branch: ${repo.baselineBranch}`}>{repo.baselineBranch}</span>
+                </div>
                 {editingId === repo.id ? (
                   <>
                     <div className="repo-row-main repo-edit-form">
@@ -310,7 +351,6 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                     <div className="repo-row-main">
                       <h2>{repo.name}</h2>
                       <button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} disabled={busy} title={repo.path}>{repo.path}</button>
-                      <span>{repo.baselineBranch}</span>
                       <div className="repo-directory-list">
                         {repo.sources.map((directory) => (
                           <div className="repo-directory-chip" key={directory}>
@@ -390,53 +430,10 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
               onSelect={(proposal) => applySettingsProposal(setSettingsEditor, proposal)}
               onClear={() => clearSettingsProposal(setSettingsEditor)}
             />
-            <SourceStructurePreviewTable directory={settingsEditor.directory} card={settingsEditor.card} preview={settingsEditor.preview} />
-            {settingsEditor.selectedProposalId !== UNSORTED_SELECTION_ID && (
-              <>
-                <SourceStructurePathBuilder
-                  directory={settingsEditor.directory}
-                  card={settingsEditor.card}
-                  preview={settingsEditor.preview}
-                  onRole={(index, role) => applySettingsSegmentRole(setSettingsEditor, index, role)}
-                />
-                <div className="metadata-form source-structure-form">
-                <label>
-                  Path Pattern
-                  <input
-                    value={settingsEditor.card.pathPattern}
-                    onChange={(event) => updateSettingsCard(setSettingsEditor, { pathPattern: event.target.value })}
-                    placeholder="{folder}/feature/{item}"
-                  />
-                </label>
-                <div className="repo-field-grid">
-                  <label>
-                    Title
-                    <input value={settingsEditor.card.fields.title ?? ''} onChange={(event) => updateSettingsField(setSettingsEditor, 'title', event.target.value)} placeholder="readme_heading" />
-                  </label>
-                  <label>
-                    Default Status
-                    <select value={settingsEditor.card.fields.status ?? 'draft'} onChange={(event) => updateSettingsField(setSettingsEditor, 'status', event.target.value)}>
-                      <option value="ideas">Ideas</option>
-                      <option value="draft">Draft</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="review">Review</option>
-                      <option value="done">Done</option>
-                    </select>
-                  </label>
-                </div>
-                <div className="repo-field-grid">
-                  <label>
-                    Owner
-                    <input value={settingsEditor.card.fields.owner ?? ''} onChange={(event) => updateSettingsField(setSettingsEditor, 'owner', event.target.value)} placeholder="{owner} or a name" />
-                  </label>
-                  <label>
-                    Tags
-                    <input value={(settingsEditor.card.fields.tags ?? []).join(', ')} onChange={(event) => updateSettingsField(setSettingsEditor, 'tags', event.target.value)} placeholder="docs, discovery" />
-                  </label>
-                </div>
-                </div>
-              </>
-            )}
+            <SourceStructurePreviewTable
+              preview={settingsEditor.preview}
+              onChangeField={(path, field, value) => updateSettingsPreviewField(setSettingsEditor, path, field, value)}
+            />
             <footer className="modal-actions">
               {settingsEditor.exists && (
                 <button className="secondary danger" type="button" onClick={() => void resetSourceSettings()} disabled={busy}>
@@ -476,19 +473,15 @@ function SourceStructureProposalList({
       </div>
       <div className="source-proposal-grid">
         <button className={selectedProposalId === UNSORTED_SELECTION_ID ? 'source-proposal-card active' : 'source-proposal-card'} type="button" onClick={onClear}>
-          <span className="proposal-confidence neutral">Default</span>
           <strong>Unsorted</strong>
           <span>Keep this source as one unstructured item in the Unsorted lane.</span>
-          <small>No settings file</small>
         </button>
         {proposals.map((proposal) => {
           const selected = selectedProposalId === proposal.id;
           return (
             <button className={selected ? 'source-proposal-card active' : 'source-proposal-card'} type="button" key={proposal.id} onClick={() => onSelect(proposal)}>
-              <span className="proposal-confidence">{proposal.confidence}</span>
               <strong>{proposal.label}</strong>
               <span>{proposal.summary}</span>
-              <small>{proposal.card.pathPattern}</small>
             </button>
           );
         })}
@@ -497,41 +490,29 @@ function SourceStructureProposalList({
   );
 }
 
-function SourceStructurePathBuilder({ directory, card, preview, onRole }: { directory: string; card: SourceStructureCard; preview: SourceStructurePreview[]; onRole: (index: number, role: SourceStructureSegmentRole) => void }) {
-  const samplePath = preview[0]?.path ?? [directory, ...card.pathPattern.split('/')].filter(Boolean).join('/');
-  const segments = previewPathSegments(samplePath, directory);
-  if (segments.length === 0) return null;
-  return (
-    <section className="source-path-builder" aria-label="Path segment builder">
-      <div className="source-structure-section-heading">
-        <strong>Click path segments</strong>
-        <span>Mark which parts become card fields.</span>
-      </div>
-      <div className="source-segment-list">
-        {segments.map((segment, index) => (
-          <div className="source-segment-card" key={`${segment}-${index}`}>
-            <span className="source-segment-pill">{segment}</span>
-            <div className="segment-role-actions" role="group" aria-label={`Role for ${segment}`}>
-              <button type="button" onClick={() => onRole(index, 'folder')}>Folder</button>
-              <button type="button" onClick={() => onRole(index, 'item')}>Item</button>
-              <button type="button" onClick={() => onRole(index, 'literal')}>Fixed</button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function SourceStructurePreviewTable({ directory, card, preview }: { directory: string; card: SourceStructureCard; preview: SourceStructurePreview[] }) {
-  const sourceFallback = true;
+function SourceStructurePreviewTable({ preview, onChangeField }: {
+  preview: SourceStructurePreview[];
+  onChangeField: (path: string, field: 'item' | 'title' | 'status', value: string) => void;
+}) {
+  const [mode, setMode] = useState<'table' | 'tree'>('table');
   return (
     <section className="source-preview" aria-label="Source structure preview">
       <div className="source-structure-section-heading">
-        <strong>Preview</strong>
-        <span>{preview.length === 0 ? 'No matching card directories yet.' : `${preview.length} sample cards`}</span>
+        <strong>Item mapping</strong>
+        <div className="source-preview-heading-actions">
+          <span>{preview.length === 0 ? 'No matching card directories yet.' : `${preview.length} sample cards`}</span>
+          {preview.length > 0 && (
+            <button
+              type="button"
+              className="source-preview-mode-toggle"
+              onClick={() => setMode((current) => current === 'table' ? 'tree' : 'table')}
+            >
+              {mode === 'table' ? 'Tree view' : 'Table view'}
+            </button>
+          )}
+        </div>
       </div>
-      {preview.length > 0 && (
+      {preview.length > 0 && mode === 'table' && (
         <div className="source-preview-table">
           <div className="source-preview-row heading">
             <span>Path</span>
@@ -543,16 +524,143 @@ function SourceStructurePreviewTable({ directory, card, preview }: { directory: 
           {preview.map((row) => (
             <div className="source-preview-row" key={row.path}>
               <span title={row.path}>{row.path}</span>
-              <span>{sourceFallback && (row.source ?? row.scope) === (lastPathSegment(directory) || 'source') ? <><span>{row.source ?? row.scope}</span><small>configured source</small></> : row.source ?? row.scope}</span>
-              <span>{row.item ?? row.identifier}</span>
-              <span>{row.title}</span>
-              <span>{row.status}</span>
+              <span>{row.source ?? row.scope}</span>
+              <span><input value={row.item ?? row.identifier ?? ''} onChange={(event) => onChangeField(row.path, 'item', event.target.value)} /></span>
+              <span><input value={row.title ?? ''} onChange={(event) => onChangeField(row.path, 'title', event.target.value)} /></span>
+              <span>
+                <select value={row.status ?? 'draft'} onChange={(event) => onChangeField(row.path, 'status', event.target.value)}>
+                  <option value="unsorted">Unsorted</option>
+                  <option value="ideas">Ideas</option>
+                  <option value="draft">Draft</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="review">Review</option>
+                  <option value="done">Done</option>
+                </select>
+              </span>
             </div>
           ))}
         </div>
       )}
+      {preview.length > 0 && mode === 'tree' && <SourcePreviewTree preview={preview} />}
     </section>
   );
+}
+
+type PreviewTreeNode = {
+  name: string;
+  path: string;
+  row?: SourceStructurePreview;
+  children: PreviewTreeNode[];
+};
+
+function SourcePreviewTree({ preview }: { preview: SourceStructurePreview[] }) {
+  return (
+    <div className="source-preview-tree" role="tree" aria-label="Source item tree preview">
+      {buildSourcePreviewTree(preview).map((node) => <SourcePreviewTreeNodeView key={node.path} node={node} />)}
+    </div>
+  );
+}
+
+function SourcePreviewTreeNodeView({ node }: { node: PreviewTreeNode }) {
+  return (
+    <div className="source-preview-tree-node" role="treeitem" aria-label={node.path}>
+      <span className="source-preview-tree-label">{node.name}</span>
+      {node.row && (
+        <small>
+          item: {node.row.item ?? node.row.identifier} - title: {node.row.title} - status: {node.row.status}
+        </small>
+      )}
+      {node.children.length > 0 && (
+        <div className="source-preview-tree-children" role="group">
+          {node.children.map((child) => <SourcePreviewTreeNodeView key={child.path} node={child} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function buildSourcePreviewTree(preview: SourceStructurePreview[]): PreviewTreeNode[] {
+  type MutableTreeNode = PreviewTreeNode & { childMap: Map<string, MutableTreeNode> };
+  const roots = new Map<string, MutableTreeNode>();
+  for (const row of preview) {
+    const segments = row.path.split('/').filter(Boolean);
+    let pathSoFar = '';
+    let scope = roots;
+    let currentNode: MutableTreeNode | null = null;
+    for (const segment of segments) {
+      pathSoFar = pathSoFar ? `${pathSoFar}/${segment}` : segment;
+      if (!scope.has(segment)) {
+        scope.set(segment, { name: segment, path: pathSoFar, children: [], childMap: new Map() });
+      }
+      currentNode = scope.get(segment) ?? null;
+      scope = currentNode?.childMap ?? new Map();
+    }
+    if (currentNode) currentNode.row = row;
+  }
+
+  const toImmutable = (nodes: Map<string, MutableTreeNode>): PreviewTreeNode[] => Array.from(nodes.values())
+    .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }))
+    .map((node) => ({
+      name: node.name,
+      path: node.path,
+      row: node.row,
+      children: toImmutable(node.childMap)
+    }));
+
+  return toImmutable(roots);
+}
+
+function WorkspaceNoticePanel({ notice, onDismiss }: { notice: WorkspaceNotice; onDismiss: () => void }) {
+  return (
+    <section className={`workspace-notice ${notice.tone}`} role="status" aria-live="polite">
+      <div>
+        <strong>{notice.title}</strong>
+        {notice.details && notice.details.length > 0 && (
+          <ul>
+            {notice.details.map((detail, index) => <li key={`${detail}-${index}`}>{detail}</li>)}
+          </ul>
+        )}
+      </div>
+      <button className="icon-button" type="button" onClick={onDismiss} aria-label="Dismiss notification">
+        <X size={15} />
+      </button>
+    </section>
+  );
+}
+
+function scanNotice(repo: WorkspaceConfig, result: ScanResult, title = 'Workspace scanned'): WorkspaceNotice {
+  const warnings = scanWarnings(result);
+  return {
+    tone: warnings.length > 0 ? 'info' : 'success',
+    title,
+    details: [
+      scanSummary(repo, result),
+      ...warnings.slice(0, 3).map((warning) => `Warning${warning.itemPath ? ` (${warning.itemPath})` : ''}: ${warning.message}`)
+    ]
+  };
+}
+
+function sourceSettingsNotice(title: string, repo: WorkspaceConfig, scan?: ScanResult): WorkspaceNotice {
+  return scan ? scanNotice(repo, scan, title) : { tone: 'success', title, details: [repo.name] };
+}
+
+function scanSummary(repo: WorkspaceConfig, result: ScanResult): string {
+  const warningCount = scanWarnings(result).length;
+  return `${repo.name}: ${result.itemCount} item${result.itemCount === 1 ? '' : 's'} indexed at ${formatScanTime(result.scannedAt)}${warningCount > 0 ? ` with ${warningCount} warning${warningCount === 1 ? '' : 's'}` : ''}.`;
+}
+
+function scanWarnings(result: ScanResult): ScanResult['warnings'] {
+  return Array.isArray(result.warnings) ? result.warnings : [];
+}
+
+function formatScanTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : 'Unexpected error';
 }
 
 function SourcesField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
@@ -675,43 +783,6 @@ function withInferredCompatibilityFields(card: SourceStructureCard, directory: s
   };
 }
 
-function updateSettingsCard(
-  setSettingsEditor: Dispatch<SetStateAction<SettingsEditorState | null>>,
-  patch: Partial<SourceStructureCard>
-) {
-  setSettingsEditor((current) => {
-    if (!current) return current;
-    return {
-      ...current,
-      card: withInferredCompatibilityFields({ ...current.card, ...patch }, current.directory),
-      selectedProposalId: undefined,
-      preview: []
-    };
-  });
-}
-
-function updateSettingsField(
-  setSettingsEditor: Dispatch<SetStateAction<SettingsEditorState | null>>,
-  field: keyof SourceStructureCard['fields'],
-  value: string
-) {
-  setSettingsEditor((current) => {
-    if (!current) return current;
-    const nextValue = field === 'tags' ? value.split(',').map((item) => item.trim()).filter(Boolean) : value;
-    return {
-      ...current,
-      selectedProposalId: undefined,
-      card: {
-        ...current.card,
-        fields: {
-          ...current.card.fields,
-          [field]: nextValue
-        }
-      }
-    };
-  });
-}
-
 function applySettingsProposal(
   setSettingsEditor: Dispatch<SetStateAction<SettingsEditorState | null>>,
   proposal: SourceStructureProposal
@@ -737,29 +808,103 @@ function clearSettingsProposal(
   } : current);
 }
 
-function applySettingsSegmentRole(
+function updateSettingsPreviewField(
   setSettingsEditor: Dispatch<SetStateAction<SettingsEditorState | null>>,
-  index: number,
-  role: SourceStructureSegmentRole
+  path: string,
+  field: 'item' | 'title' | 'status',
+  value: string
 ) {
   setSettingsEditor((current) => {
     if (!current) return current;
-    const samplePath = current.preview[0]?.path ?? [current.directory, ...current.card.pathPattern.split('/')].filter(Boolean).join('/');
-    const sampleSegments = previewPathSegments(samplePath, current.directory);
-    const pathPattern = applySegmentRole(current.card.pathPattern, sampleSegments, index, role);
-    const nextCard = withInferredCompatibilityFields({ ...current.card, pathPattern }, current.directory);
-    const matchingProposal = current.proposals.find((proposal) => cardsMatch(nextCard, normalizeSettingsCard(proposal.card, current.directory)));
+    const normalized = value.trim();
+    const nextCard = { ...current.card, fields: { ...current.card.fields } };
+    let nextPreview: SourceStructurePreview[] = current.preview.map((row) => ({
+      ...row,
+      item: row.path === path && field === 'item' ? value : row.item,
+      identifier: row.path === path && field === 'item' ? value : row.identifier,
+      title: row.path === path && field === 'title' ? value : row.title,
+      status: row.path === path && field === 'status' ? value as SourceStructurePreview['status'] : row.status
+    }));
+    if (field === 'item') {
+      nextCard.fields.item = normalized;
+      nextCard.fields.identifier = normalized;
+      const suggestedTemplate = suggestTemplateFromValue(current.directory, current.card.pathPattern, path, normalized, true);
+      if (suggestedTemplate) {
+        nextCard.fields.item = suggestedTemplate;
+        nextCard.fields.identifier = suggestedTemplate;
+        nextPreview = current.preview.map((row): SourceStructurePreview => {
+          const captures = pathPatternCaptures(current.directory, current.card.pathPattern, row.path);
+          const rendered = captures ? renderTemplateWithCaptures(suggestedTemplate, captures) : '';
+          const resolved = rendered || (row.path === path ? normalized : row.item ?? row.identifier);
+          return { ...row, item: resolved, identifier: resolved };
+        });
+      }
+    }
+    if (field === 'title') {
+      nextCard.fields.title = value;
+      const suggestedTemplate = suggestTemplateFromValue(current.directory, current.card.pathPattern, path, normalized, false);
+      if (suggestedTemplate) {
+        nextCard.fields.title = suggestedTemplate;
+        nextPreview = current.preview.map((row): SourceStructurePreview => {
+          const captures = pathPatternCaptures(current.directory, current.card.pathPattern, row.path);
+          const rendered = captures ? renderTemplateWithCaptures(suggestedTemplate, captures) : '';
+          const resolved = rendered || (row.path === path ? value : row.title);
+          return { ...row, item: row.item, identifier: row.identifier, title: resolved };
+        });
+      }
+    }
+    if (field === 'status') {
+      nextCard.fields.status = value;
+    }
+
     return {
       ...current,
+      selectedProposalId: undefined,
       card: nextCard,
-      selectedProposalId: matchingProposal?.id,
-      preview: matchingProposal?.preview ?? current.preview
+      preview: nextPreview
     };
   });
 }
 
-function cardsMatch(left: SourceStructureCard, right: SourceStructureCard): boolean {
-  return left.pathPattern === right.pathPattern
-    && (left.fields.source ?? left.fields.scope) === (right.fields.source ?? right.fields.scope)
-    && (left.fields.item ?? left.fields.identifier) === (right.fields.item ?? right.fields.identifier);
+function suggestTemplateFromValue(directory: string, pathPattern: string, rowPath: string, value: string, allowMultiSegment: boolean): string | null {
+  if (!value) return null;
+  const captures = pathPatternCaptures(directory, pathPattern, rowPath);
+  if (!captures) return null;
+  const segments = value.split('/').map((segment) => segment.trim()).filter(Boolean);
+  if (segments.length === 0) return null;
+  if (!allowMultiSegment && segments.length > 1) return null;
+
+  const used = new Set<string>();
+  const templateSegments: string[] = [];
+  for (const segment of segments) {
+    const options = Object.entries(captures)
+      .filter(([name, value]) => value === segment && !used.has(name));
+    if (options.length !== 1) return null;
+    used.add(options[0][0]);
+    templateSegments.push(`{${options[0][0]}}`);
+  }
+  return templateSegments.join('/');
+}
+
+function pathPatternCaptures(directory: string, pathPattern: string, rowPath: string): Record<string, string> | null {
+  const patternSegments = pathPattern.split('/').map((segment) => segment.trim()).filter(Boolean);
+  const rowSegments = previewPathSegments(rowPath, directory);
+  if (patternSegments.length === 0 || patternSegments.length !== rowSegments.length) return null;
+
+  const captures: Record<string, string> = {};
+  for (let index = 0; index < patternSegments.length; index += 1) {
+    const patternSegment = patternSegments[index];
+    const rowSegment = rowSegments[index];
+    const variable = patternSegment.match(/^\{([A-Za-z][A-Za-z0-9_]*)\}$/)?.[1];
+    if (variable) {
+      captures[variable] = rowSegment;
+      continue;
+    }
+    if (patternSegment !== rowSegment) return null;
+  }
+  return captures;
+}
+
+function renderTemplateWithCaptures(template: string, captures: Record<string, string>): string {
+  return Object.entries(captures).reduce((result, [name, value]) => result.replaceAll(`{${name}}`, value), template).trim();
 }

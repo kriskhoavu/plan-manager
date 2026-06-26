@@ -86,6 +86,46 @@ describe('KanbanPage', () => {
     expect(within(card as HTMLElement).queryByText('No date')).not.toBeInTheDocument();
   });
 
+  it('shows only configured Kanban status columns', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/kanban/branch') return Promise.resolve(response(branchLoadResult([draftItem], 'main')));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+      return Promise.resolve(response({}));
+    }));
+
+    render(<KanbanPage workspace={workspace} refreshKey={0} visibleStatuses={['draft', 'review']} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    expect(await screen.findByRole('heading', { name: 'Draft' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Unsorted' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Done' })).not.toBeInTheDocument();
+    expect(screen.getByText('Drag cards')).toBeInTheDocument();
+  });
+
+  it('filters to and opens a focused card from the route', async () => {
+    const detail = { ...draftItem, documents: [], metadata: {}, counts: { files: 0 } };
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/workspaces/r1/kanban/branch') return Promise.resolve(response(branchLoadResult([draftItem], 'main')));
+      if (url === '/api/items/p1') return Promise.resolve(response(detail));
+      if (url === '/api/items/p1/files') return Promise.resolve(response([]));
+      if (url === '/api/items/p1/diff') return Promise.resolve(response({ diff: '' }));
+      if (url === '/api/saved-filters') return Promise.resolve(response([]));
+      if (url === '/api/workspaces/r1/git/status') return Promise.resolve(response({ workspaceId: 'r1', branch: 'main', ahead: 0, behind: 0, dirty: false, conflicted: false, changes: [] }));
+      if (url === '/api/workspaces/r1/git/branches') return Promise.resolve(response({ workspaceId: 'r1', current: 'main', branches: ['main'] }));
+      return Promise.resolve(response({}));
+    }));
+
+    render(<KanbanPage workspace={workspace} refreshKey={0} focusedItemId="p1" onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByPlaceholderText('Search items...')).toHaveValue('PM-012'));
+    expect(await screen.findByLabelText('Item preview')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Drag cards' })).toBeInTheDocument();
+  });
+
   it('shows the active branch context and switches the loaded branch', async () => {
     const mainItems = [draftItem];
     const featureItems = [{ ...draftItem, id: 'p2', title: 'Feature item', branch: 'feature/pm-012' }];

@@ -102,9 +102,9 @@
   min-height: 34px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: var(--panel-soft);
+  background-color: var(--panel-soft);
   color: var(--text);
-  padding: 0 7px;
+  padding: 0 24px 0 7px;
 }
 
 .explorer-panel-header {
@@ -126,9 +126,9 @@
   min-height: 32px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: var(--panel-soft);
+  background-color: var(--panel-soft);
   color: var(--text);
-  padding: 0 8px;
+  padding: 0 24px 0 8px;
   font-size: 12px;
 }
 

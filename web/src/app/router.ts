@@ -7,8 +7,9 @@ export interface ExplorerLocation {
 }
 
 export type Route =
-  | { name: 'kanban' }
+  | { name: 'kanban'; focusedItemId?: string }
   | { name: 'workspaces' }
+  | { name: 'settings' }
   | { name: 'explorer'; location?: ExplorerLocation }
   | { name: 'workspace'; itemId: string };
 
@@ -20,10 +21,13 @@ export function routeFromLocation(): Route {
   if (path.startsWith('/workspaces')) {
     return { name: 'workspaces' };
   }
+  if (path.startsWith('/settings')) {
+    return { name: 'settings' };
+  }
   if (path === '/explorer') {
     return { name: 'explorer', location: explorerLocationFromSearch(window.location.search) };
   }
-  return { name: 'kanban' };
+  return { name: 'kanban', focusedItemId: kanbanFocusedItemFromSearch(window.location.search) };
 }
 
 export function pathForRoute(route: Route): string {
@@ -34,7 +38,9 @@ export function pathForRoute(route: Route): string {
     ? `/items/${encodeURIComponent(route.itemId)}`
     : route.name === 'workspaces'
       ? '/workspaces'
-      : '/kanban';
+      : route.name === 'settings'
+        ? '/settings'
+        : kanbanPath(route.focusedItemId);
 }
 
 export function explorerLocationFromSearch(search: string): ExplorerLocation | undefined {
@@ -52,4 +58,13 @@ export function explorerPath(location?: ExplorerLocation): string {
   if (location?.path) query.set('path', location.path);
 	if (location?.mode) query.set('mode', location.mode);
   return query.size ? `/explorer?${query.toString()}` : '/explorer';
+}
+
+function kanbanFocusedItemFromSearch(search: string): string | undefined {
+  return new URLSearchParams(search).get('itemId')?.trim() || undefined;
+}
+
+function kanbanPath(focusedItemId?: string): string {
+  if (!focusedItemId) return '/kanban';
+  return `/kanban?${new URLSearchParams({ itemId: focusedItemId }).toString()}`;
 }

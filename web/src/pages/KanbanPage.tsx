@@ -1,27 +1,60 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, Dispatch, DragEvent, MouseEvent, MutableRefObject, PointerEvent as ReactPointerEvent, SetStateAction } from 'react';
 import { BookmarkPlus, Check, ChevronDown, Code2, FileText, Filter, FolderGit2, GitBranch, GitCommitHorizontal, GripVertical, Info, KanbanSquare, RefreshCw, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { FileMenu } from '../components/FileMenu';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels, statusOrder } from '../lib/api';
-import type { BranchLoadResult, FileContent, FileNode, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemSummary, SavedFilter, WorkspaceConfig } from '../lib/types';
+import type {
+  BranchLoadResult,
+  FileContent,
+  FileNode,
+  GitStatus,
+  ItemDetail,
+  ItemMetadataUpdateInput,
+  ItemStatus,
+  ItemSummary,
+  SavedFilter,
+  SourceSettingsResult,
+  SourceStructureCard,
+  SourceStructurePreview,
+  SourceStructureProposal,
+  SourceStructureSettings,
+  WorkspaceConfig
+} from '../lib/types';
 import { labels, metadataSourceLabel as genericMetadataSourceLabel } from '../lib/vocabulary';
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/kanban/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/kanban/filtering';
 import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/kanban/dragAndDrop';
+import { inferCompatibilityFields, lastPathSegment, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 
 type DrawerTab = 'preview' | 'raw' | 'diff';
 type DrawerSideTab = 'info' | 'git';
 type DrawerFileOption = { id: string; path: string; label: string };
 const DRAG_CLICK_SUPPRESSION_MS = 350;
+const UNSORTED_SELECTION_ID = 'unsorted';
+
+type SourceItemsEditorState = {
+  workspace: WorkspaceConfig;
+  directory: string;
+  exists: boolean;
+  mode?: string;
+  card: SourceStructureCard;
+  warnings: string[];
+  proposals: SourceStructureProposal[];
+  selectedProposalId?: string;
+  unsortedPreview: SourceStructurePreview[];
+  preview: SourceStructurePreview[];
+};
 
 export { filterPlans };
 
-export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces }: {
+export function KanbanPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, onOpenPlan, onWorkspacesChanged, onOpenWorkspaces }: {
   workspace?: WorkspaceConfig;
   refreshKey: number;
+  visibleStatuses?: ItemStatus[];
+  focusedItemId?: string;
   onOpenPlan: (itemId: string) => void;
   onWorkspacesChanged: () => void | Promise<void>;
   onOpenWorkspaces?: () => void;
@@ -51,8 +84,15 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
   const [branchContext, setBranchContext] = useState<BranchLoadResult | null>(null);
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const [branchSearch, setBranchSearch] = useState('');
+  const [sourceItemsOpen, setSourceItemsOpen] = useState(false);
+  const [sourceItemsLoading, setSourceItemsLoading] = useState(false);
+  const [sourceItemsSaving, setSourceItemsSaving] = useState(false);
+  const [sourceItemsDirectory, setSourceItemsDirectory] = useState('');
+  const [sourceItemsError, setSourceItemsError] = useState('');
+  const [sourceItemsEditor, setSourceItemsEditor] = useState<SourceItemsEditorState | null>(null);
   const branchPickerRef = useRef<HTMLDivElement | null>(null);
   const suppressPreviewRef = useRef<{ itemId: string; until: number } | null>(null);
+  const appliedFocusRef = useRef('');
   const text = query;
 
   const loadBranch = async (branch = selectedBranch, force = false) => {
@@ -96,6 +136,17 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
     }
     void loadBranch(workspace.lastSelectedBranch || workspace.baselineBranch, false);
   }, [workspace?.id, refreshKey]);
+
+  useEffect(() => {
+    if (!focusedItemId || loading) return;
+    const focusKey = `${workspace?.id ?? ''}:${focusedItemId}:${selectedBranch}`;
+    if (appliedFocusRef.current === focusKey) return;
+    const item = items.find((candidate) => candidate.id === focusedItemId);
+    if (!item) return;
+    appliedFocusRef.current = focusKey;
+    setQuery(item.identifier || item.title);
+    setDrawerPlanId(item.id);
+  }, [focusedItemId, items, loading, selectedBranch, workspace?.id]);
 
   useEffect(() => {
     if (!branchMenuOpen) return;
@@ -183,12 +234,34 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
     + filters.authors.length
     + (text ? 1 : 0);
   const sourceMode = branchContext?.sourceMode ?? 'working_tree';
+  const displayedStatuses = useMemo(() => {
+    const visible = new Set(visibleStatuses);
+    const statuses = statusOrder.filter((status) => visible.has(status));
+    return statuses.length > 0 ? statuses : statusOrder;
+  }, [visibleStatuses]);
+  const boardStyle = useMemo(() => ({
+    gridTemplateColumns: displayedStatuses
+      .flatMap((status) => status === 'unsorted' ? ['minmax(260px, 1fr)', '44px'] : ['minmax(260px, 1fr)'])
+      .join(' ')
+  }) as CSSProperties, [displayedStatuses]);
   const grouped = useMemo(() => {
     const map = new Map<ItemStatus, ItemSummary[]>();
-    statusOrder.forEach((item) => map.set(item, []));
+    displayedStatuses.forEach((item) => map.set(item, []));
     filteredPlans.forEach((plan) => map.get(plan.status)?.push(plan));
     return map;
-  }, [filteredPlans]);
+  }, [displayedStatuses, filteredPlans]);
+  const preferredSourceForConfiguration = useMemo(() => {
+    if (!workspace) return '';
+    const unsortedSources = new Set(
+      items
+        .filter((item) => item.status === 'unsorted')
+        .map((item) => sourceLabel(item, workspace))
+        .filter(Boolean)
+    );
+    const firstWorkspaceUnsortedSource = workspace.sources.find((source) => unsortedSources.has(source));
+    if (firstWorkspaceUnsortedSource) return firstWorkspaceUnsortedSource;
+    return Array.from(unsortedSources)[0] ?? workspace.sources[0] ?? '';
+  }, [items, workspace]);
   const activeItem = activeItemId ? items.find((item) => item.id === activeItemId) : undefined;
 
   const scan = async () => {
@@ -308,6 +381,84 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
       setNewPlanError(err instanceof Error ? err.message : 'Item creation failed');
     } finally {
       setCreatingPlan(false);
+    }
+  };
+
+  const loadSourceItemsSettings = async (directory: string) => {
+    if (!workspace) return;
+    setSourceItemsLoading(true);
+    setSourceItemsError('');
+    setSourceItemsDirectory(directory);
+    try {
+      const result = await api.sourceStructure(workspace.id, directory);
+      setSourceItemsEditor(sourceItemsEditorFromResult(workspace, directory, result));
+    } catch (err) {
+      setSourceItemsEditor(null);
+      setSourceItemsError(err instanceof Error ? err.message : 'Source settings failed to load');
+    } finally {
+      setSourceItemsLoading(false);
+    }
+  };
+
+  const openSourceItemsDialog = async () => {
+    if (!workspace || workspace.sources.length === 0) {
+      onOpenWorkspaces?.();
+      return;
+    }
+    const initialDirectory = preferredSourceForConfiguration;
+    setSourceItemsOpen(true);
+    void loadSourceItemsSettings(initialDirectory);
+  };
+
+  const saveSourceItemsSettings = async () => {
+    if (!sourceItemsEditor) return;
+    setSourceItemsSaving(true);
+    setSourceItemsError('');
+    try {
+      if (sourceItemsEditor.selectedProposalId === UNSORTED_SELECTION_ID) {
+        if (sourceItemsEditor.exists) {
+          await api.resetSourceStructure(sourceItemsEditor.workspace.id, sourceItemsEditor.directory);
+          setScanState('Source structure reset');
+        } else {
+          const result = await api.scan(sourceItemsEditor.workspace.id);
+          setScanState(`${result.itemCount} items indexed`);
+        }
+      } else {
+        const settings: SourceStructureSettings = {
+          version: 1,
+          cards: [withInferredCompatibilityFields(sourceItemsEditor.card, sourceItemsEditor.directory)]
+        };
+        await api.saveSourceStructure(sourceItemsEditor.workspace.id, sourceItemsEditor.directory, settings);
+        setScanState('Source structure saved');
+      }
+      notifyReliabilityChanged();
+      setSourceItemsOpen(false);
+      await onWorkspacesChanged();
+      await reloadPlans();
+    } catch (err) {
+      setSourceItemsError(err instanceof Error ? err.message : 'Source settings failed to save');
+    } finally {
+      setSourceItemsSaving(false);
+    }
+  };
+
+  const resetSourceItemsSettings = async () => {
+    if (!sourceItemsEditor) return;
+    const confirmed = window.confirm(`Reset Source Items for ${sourceItemsEditor.directory}? This removes workspace-settings.yaml and scans the source again.`);
+    if (!confirmed) return;
+    setSourceItemsSaving(true);
+    setSourceItemsError('');
+    try {
+      const result = await api.resetSourceStructure(sourceItemsEditor.workspace.id, sourceItemsEditor.directory);
+      notifyReliabilityChanged();
+      setSourceItemsEditor(sourceItemsEditorFromResult(sourceItemsEditor.workspace, sourceItemsEditor.directory, result));
+      setScanState('Source structure reset');
+      await onWorkspacesChanged();
+      await reloadPlans();
+    } catch (err) {
+      setSourceItemsError(err instanceof Error ? err.message : 'Source settings failed to reset');
+    } finally {
+      setSourceItemsSaving(false);
     }
   };
 
@@ -483,8 +634,8 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
         {activeFilterCount > 0 && <span>{activeFilterCount} active filters</span>}
       </div>
       {error && <p className="error" role="alert">{error}</p>}
-      <div className="kanban-board" aria-busy={loading}>
-        {statusOrder.map((column) => (
+      <div className="kanban-board" style={boardStyle} aria-busy={loading}>
+        {displayedStatuses.map((column) => (
           <Fragment key={column}>
             <KanbanColumn
               status={column}
@@ -523,7 +674,7 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
               ))}
             </KanbanColumn>
             {column === 'unsorted' && (
-              <button className="kanban-separator" type="button" onClick={onOpenWorkspaces} disabled={!onOpenWorkspaces} title="Configure source items">
+              <button className="kanban-separator" type="button" onClick={() => void openSourceItemsDialog()} title="Configure source items">
                 <span className="separator-arrow">▶</span>
                 <span className="separator-count">{grouped.get('unsorted')?.length ?? 0}</span>
                 <span className="separator-label">Configure source items</span>
@@ -544,6 +695,76 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
             await reloadPlans();
           }}
         />
+      )}
+      {sourceItemsOpen && workspace && (
+        <div className="modal-backdrop" role="presentation">
+          <div className="modal-panel source-structure-modal" role="dialog" aria-modal="true" aria-label={labels.sourceStructure}>
+            <header>
+              <div>
+                <h2>{labels.sourceStructure}</h2>
+                <span>{workspace.name} / {sourceItemsDirectory || workspace.sources[0]}</span>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setSourceItemsOpen(false)} disabled={sourceItemsSaving} aria-label="Close source items">
+                <X size={16} />
+              </button>
+            </header>
+            {workspace.sources.length > 1 && (
+              <label className="repo-field">
+                Source
+                <select value={sourceItemsDirectory} onChange={(event) => void loadSourceItemsSettings(event.target.value)} disabled={sourceItemsLoading || sourceItemsSaving}>
+                  {workspace.sources.map((directory) => <option key={directory} value={directory}>{directory}</option>)}
+                </select>
+              </label>
+            )}
+            <p className="modal-help">Define how this source should be split into Kanban items.</p>
+            {sourceItemsLoading && <span className="reliability-muted">Loading source settings...</span>}
+            {!sourceItemsLoading && sourceItemsError && <span className="error">{sourceItemsError}</span>}
+            {!sourceItemsLoading && sourceItemsEditor && (
+              <>
+                {!sourceItemsEditor.exists && sourceItemsEditor.mode === 'structured' && (
+                  <div className="metadata-callout source-structure-supported">
+                    <strong>Built-in structure detected</strong>
+                    <span>This source already follows a supported item layout. Saving here creates an optional override.</span>
+                  </div>
+                )}
+                {!sourceItemsEditor.exists && sourceItemsEditor.mode !== 'structured' && (
+                  <div className="metadata-callout">
+                    <strong>No settings file yet</strong>
+                    <span>Saving creates workspace-settings.yaml inside this source.</span>
+                  </div>
+                )}
+                {sourceItemsEditor.warnings.length > 0 && (
+                  <div className="plan-warnings">
+                    <h3>Warnings</h3>
+                    {sourceItemsEditor.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+                  </div>
+                )}
+                <SourceStructureProposalList
+                  proposals={sourceItemsEditor.proposals}
+                  selectedProposalId={sourceItemsEditor.selectedProposalId}
+                  onSelect={(proposal) => applySourceItemsProposal(setSourceItemsEditor, proposal)}
+                  onClear={() => clearSourceItemsProposal(setSourceItemsEditor)}
+                />
+                <SourceStructurePreviewTable
+                  preview={sourceItemsEditor.preview}
+                  onChangeField={(path, field, value) => updateSourceItemsPreviewField(setSourceItemsEditor, path, field, value)}
+                />
+              </>
+            )}
+            <footer className="modal-actions">
+              {sourceItemsEditor?.exists && (
+                <button className="secondary danger" type="button" onClick={() => void resetSourceItemsSettings()} disabled={sourceItemsSaving || sourceItemsLoading}>
+                  Reset config
+                </button>
+              )}
+              <button className="secondary" type="button" onClick={() => setSourceItemsOpen(false)} disabled={sourceItemsSaving}>Cancel</button>
+              <button className="primary" type="button" onClick={() => void saveSourceItemsSettings()} disabled={sourceItemsSaving || sourceItemsLoading || !sourceItemsEditor}>
+                <SlidersHorizontal size={15} />
+                {sourceItemsSaving ? 'Saving...' : sourceItemsEditor?.selectedProposalId === UNSORTED_SELECTION_ID ? 'Scan Unsorted' : 'Save and Scan'}
+              </button>
+            </footer>
+          </div>
+        </div>
       )}
       {newPlanOpen && workspace && (
         <div className="modal-backdrop" role="presentation">
@@ -570,6 +791,359 @@ export function KanbanPage({ workspace, refreshKey, onOpenPlan, onWorkspacesChan
       )}
     </section>
   );
+}
+
+function SourceStructureProposalList({
+  proposals,
+  selectedProposalId,
+  onSelect,
+  onClear
+}: {
+  proposals: SourceStructureProposal[];
+  selectedProposalId?: string;
+  onSelect: (proposal: SourceStructureProposal) => void;
+  onClear: () => void;
+}) {
+  if (proposals.length === 0) return null;
+  return (
+    <section className="source-proposals" aria-label="Source structure proposals">
+      <div className="source-structure-section-heading">
+        <strong>Suggested structures</strong>
+        <span>Choose a structure, or keep the source unsorted.</span>
+      </div>
+      <div className="source-proposal-grid">
+        <button className={selectedProposalId === UNSORTED_SELECTION_ID ? 'source-proposal-card active' : 'source-proposal-card'} type="button" onClick={onClear}>
+          <strong>Unsorted</strong>
+          <span>Keep this source as one unstructured item in the Unsorted lane.</span>
+        </button>
+        {proposals.map((proposal) => {
+          const selected = selectedProposalId === proposal.id;
+          return (
+            <button className={selected ? 'source-proposal-card active' : 'source-proposal-card'} type="button" key={proposal.id} onClick={() => onSelect(proposal)}>
+              <strong>{proposal.label}</strong>
+              <span>{proposal.summary}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SourceStructurePreviewTable({ preview, onChangeField }: {
+  preview: SourceStructurePreview[];
+  onChangeField: (path: string, field: 'item' | 'title' | 'status', value: string) => void;
+}) {
+  const [mode, setMode] = useState<'table' | 'tree'>('table');
+  return (
+    <section className="source-preview" aria-label="Source structure preview">
+      <div className="source-structure-section-heading">
+        <strong>Item mapping</strong>
+        <div className="source-preview-heading-actions">
+          <span>{preview.length === 0 ? 'No matching card directories yet.' : `${preview.length} sample cards`}</span>
+          {preview.length > 0 && (
+            <button
+              type="button"
+              className="source-preview-mode-toggle"
+              onClick={() => setMode((current) => current === 'table' ? 'tree' : 'table')}
+            >
+              {mode === 'table' ? 'Tree view' : 'Table view'}
+            </button>
+          )}
+        </div>
+      </div>
+      {preview.length > 0 && mode === 'table' && (
+        <div className="source-preview-table">
+          <div className="source-preview-row heading">
+            <span>Path</span>
+            <span>Source</span>
+            <span>Item</span>
+            <span>Title</span>
+            <span>Status</span>
+          </div>
+          {preview.map((row) => (
+            <div className="source-preview-row" key={row.path}>
+              <span title={row.path}>{row.path}</span>
+              <span>{row.source ?? row.scope}</span>
+              <span><input value={row.item ?? row.identifier ?? ''} onChange={(event) => onChangeField(row.path, 'item', event.target.value)} /></span>
+              <span><input value={row.title ?? ''} onChange={(event) => onChangeField(row.path, 'title', event.target.value)} /></span>
+              <span>
+                <select value={row.status ?? 'draft'} onChange={(event) => onChangeField(row.path, 'status', event.target.value)}>
+                  <option value="unsorted">Unsorted</option>
+                  <option value="ideas">Ideas</option>
+                  <option value="draft">Draft</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="review">Review</option>
+                  <option value="done">Done</option>
+                </select>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {preview.length > 0 && mode === 'tree' && <SourcePreviewTree preview={preview} />}
+    </section>
+  );
+}
+
+type PreviewTreeNode = {
+  name: string;
+  path: string;
+  row?: SourceStructurePreview;
+  children: PreviewTreeNode[];
+};
+
+function SourcePreviewTree({ preview }: { preview: SourceStructurePreview[] }) {
+  return (
+    <div className="source-preview-tree" role="tree" aria-label="Source item tree preview">
+      {buildSourcePreviewTree(preview).map((node) => <SourcePreviewTreeNodeView key={node.path} node={node} />)}
+    </div>
+  );
+}
+
+function SourcePreviewTreeNodeView({ node }: { node: PreviewTreeNode }) {
+  return (
+    <div className="source-preview-tree-node" role="treeitem" aria-label={node.path}>
+      <span className="source-preview-tree-label">{node.name}</span>
+      {node.row && (
+        <small>
+          item: {node.row.item ?? node.row.identifier} - title: {node.row.title} - status: {node.row.status}
+        </small>
+      )}
+      {node.children.length > 0 && (
+        <div className="source-preview-tree-children" role="group">
+          {node.children.map((child) => <SourcePreviewTreeNodeView key={child.path} node={child} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function buildSourcePreviewTree(preview: SourceStructurePreview[]): PreviewTreeNode[] {
+  type MutableTreeNode = PreviewTreeNode & { childMap: Map<string, MutableTreeNode> };
+  const roots = new Map<string, MutableTreeNode>();
+  for (const row of preview) {
+    const segments = row.path.split('/').filter(Boolean);
+    let pathSoFar = '';
+    let scope = roots;
+    let currentNode: MutableTreeNode | null = null;
+    for (const segment of segments) {
+      pathSoFar = pathSoFar ? `${pathSoFar}/${segment}` : segment;
+      if (!scope.has(segment)) {
+        scope.set(segment, { name: segment, path: pathSoFar, children: [], childMap: new Map() });
+      }
+      currentNode = scope.get(segment) ?? null;
+      scope = currentNode?.childMap ?? new Map();
+    }
+    if (currentNode) currentNode.row = row;
+  }
+
+  const toImmutable = (nodes: Map<string, MutableTreeNode>): PreviewTreeNode[] => Array.from(nodes.values())
+    .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }))
+    .map((node) => ({
+      name: node.name,
+      path: node.path,
+      row: node.row,
+      children: toImmutable(node.childMap)
+    }));
+
+  return toImmutable(roots);
+}
+
+function sourceItemsEditorFromResult(workspace: WorkspaceConfig, directory: string, result: SourceSettingsResult): SourceItemsEditorState {
+  const proposals = result.proposals ?? [];
+  const selectedProposal = !result.exists && proposals.length > 0 ? proposals[0] : undefined;
+  const unsortedPreview = [unsortedSourcePreview(directory)];
+  const selectedProposalId = selectedProposal?.id ?? (!result.exists ? UNSORTED_SELECTION_ID : undefined);
+  return {
+    workspace,
+    directory,
+    exists: result.exists,
+    mode: result.mode,
+    card: normalizeSettingsCard(selectedProposal?.card ?? result.settings?.cards?.[0], directory),
+    warnings: (result.warnings ?? []).map((warning) => warning.message),
+    proposals,
+    selectedProposalId,
+    unsortedPreview,
+    preview: selectedProposal?.preview ?? (!result.exists ? unsortedPreview : result.preview ?? [])
+  };
+}
+
+function unsortedSourcePreview(directory: string): SourceStructurePreview {
+  const sourceName = lastPathSegment(directory) || 'source';
+  return {
+    path: directory,
+    source: sourceName,
+    item: sourceName,
+    scope: sourceName,
+    identifier: sourceName,
+    title: sourceName,
+    status: 'unsorted',
+    tags: [sourceName]
+  };
+}
+
+function normalizeSettingsCard(card?: SourceStructureCard, directory = 'source'): SourceStructureCard {
+  const legacyFields = card?.fields as SourceStructureCard['fields'] & { service?: string; ticket?: string } | undefined;
+  return withInferredCompatibilityFields({
+    pathPattern: genericTemplate(card?.pathPattern || '{folder}/feature/{item}'),
+    fields: {
+      source: genericTemplate(legacyFields?.source || legacyFields?.scope || legacyFields?.service || directory),
+      item: genericTemplate(legacyFields?.item || legacyFields?.identifier || legacyFields?.ticket || '{item}'),
+      scope: genericTemplate(legacyFields?.source || legacyFields?.scope || legacyFields?.service || directory),
+      identifier: genericTemplate(legacyFields?.item || legacyFields?.identifier || legacyFields?.ticket || '{item}'),
+      title: card?.fields?.title || 'readme_heading',
+      status: card?.fields?.status || 'draft',
+      owner: card?.fields?.owner || '',
+      tags: Array.isArray(card?.fields?.tags) ? card.fields.tags : ['docs']
+    }
+  }, directory);
+}
+
+function genericTemplate(value: string): string {
+  return value
+    .replaceAll('{service}', '{folder}')
+    .replaceAll('{scope}', '{folder}')
+    .replaceAll('{ticket}', '{item}')
+    .replaceAll('{identifier}', '{item}');
+}
+
+function withInferredCompatibilityFields(card: SourceStructureCard, directory: string): SourceStructureCard {
+  return {
+    ...card,
+    fields: {
+      ...card.fields,
+      source: inferCompatibilityFields(card.pathPattern, directory).scope,
+      item: inferCompatibilityFields(card.pathPattern, directory).identifier,
+      ...inferCompatibilityFields(card.pathPattern, directory)
+    }
+  };
+}
+
+function applySourceItemsProposal(
+  setSourceItemsEditor: Dispatch<SetStateAction<SourceItemsEditorState | null>>,
+  proposal: SourceStructureProposal
+) {
+  setSourceItemsEditor((current) => {
+    if (!current) return current;
+    return {
+      ...current,
+      card: normalizeSettingsCard(proposal.card, current.directory),
+      selectedProposalId: proposal.id,
+      preview: proposal.preview
+    };
+  });
+}
+
+function clearSourceItemsProposal(
+  setSourceItemsEditor: Dispatch<SetStateAction<SourceItemsEditorState | null>>
+) {
+  setSourceItemsEditor((current) => current ? {
+    ...current,
+    selectedProposalId: UNSORTED_SELECTION_ID,
+    preview: current.unsortedPreview
+  } : current);
+}
+
+function updateSourceItemsPreviewField(
+  setSourceItemsEditor: Dispatch<SetStateAction<SourceItemsEditorState | null>>,
+  path: string,
+  field: 'item' | 'title' | 'status',
+  value: string
+) {
+  setSourceItemsEditor((current) => {
+    if (!current) return current;
+    const normalized = value.trim();
+    const nextCard = { ...current.card, fields: { ...current.card.fields } };
+    let nextPreview: SourceStructurePreview[] = current.preview.map((row) => ({
+      ...row,
+      item: row.path === path && field === 'item' ? value : row.item,
+      identifier: row.path === path && field === 'item' ? value : row.identifier,
+      title: row.path === path && field === 'title' ? value : row.title,
+      status: row.path === path && field === 'status' ? value as SourceStructurePreview['status'] : row.status
+    }));
+    if (field === 'item') {
+      nextCard.fields.item = normalized;
+      nextCard.fields.identifier = normalized;
+      const suggestedTemplate = suggestTemplateFromValue(current.directory, current.card.pathPattern, path, normalized, true);
+      if (suggestedTemplate) {
+        nextCard.fields.item = suggestedTemplate;
+        nextCard.fields.identifier = suggestedTemplate;
+        nextPreview = current.preview.map((row): SourceStructurePreview => {
+          const captures = pathPatternCaptures(current.directory, current.card.pathPattern, row.path);
+          const rendered = captures ? renderTemplateWithCaptures(suggestedTemplate, captures) : '';
+          const resolved = rendered || (row.path === path ? normalized : row.item ?? row.identifier);
+          return { ...row, item: resolved, identifier: resolved };
+        });
+      }
+    }
+    if (field === 'title') {
+      nextCard.fields.title = value;
+      const suggestedTemplate = suggestTemplateFromValue(current.directory, current.card.pathPattern, path, normalized, false);
+      if (suggestedTemplate) {
+        nextCard.fields.title = suggestedTemplate;
+        nextPreview = current.preview.map((row): SourceStructurePreview => {
+          const captures = pathPatternCaptures(current.directory, current.card.pathPattern, row.path);
+          const rendered = captures ? renderTemplateWithCaptures(suggestedTemplate, captures) : '';
+          const resolved = rendered || (row.path === path ? value : row.title);
+          return { ...row, item: row.item, identifier: row.identifier, title: resolved };
+        });
+      }
+    }
+    if (field === 'status') {
+      nextCard.fields.status = value;
+    }
+
+    return {
+      ...current,
+      selectedProposalId: undefined,
+      card: nextCard,
+      preview: nextPreview
+    };
+  });
+}
+
+function suggestTemplateFromValue(directory: string, pathPattern: string, rowPath: string, value: string, allowMultiSegment: boolean): string | null {
+  if (!value) return null;
+  const captures = pathPatternCaptures(directory, pathPattern, rowPath);
+  if (!captures) return null;
+  const segments = value.split('/').map((segment) => segment.trim()).filter(Boolean);
+  if (segments.length === 0) return null;
+  if (!allowMultiSegment && segments.length > 1) return null;
+
+  const used = new Set<string>();
+  const templateSegments: string[] = [];
+  for (const segment of segments) {
+    const options = Object.entries(captures)
+      .filter(([name, value]) => value === segment && !used.has(name));
+    if (options.length !== 1) return null;
+    used.add(options[0][0]);
+    templateSegments.push(`{${options[0][0]}}`);
+  }
+  return templateSegments.join('/');
+}
+
+function pathPatternCaptures(directory: string, pathPattern: string, rowPath: string): Record<string, string> | null {
+  const patternSegments = pathPattern.split('/').map((segment) => segment.trim()).filter(Boolean);
+  const rowSegments = previewPathSegments(rowPath, directory);
+  if (patternSegments.length === 0 || patternSegments.length !== rowSegments.length) return null;
+
+  const captures: Record<string, string> = {};
+  for (let index = 0; index < patternSegments.length; index += 1) {
+    const patternSegment = patternSegments[index];
+    const rowSegment = rowSegments[index];
+    const variable = patternSegment.match(/^\{([A-Za-z][A-Za-z0-9_]*)\}$/)?.[1];
+    if (variable) {
+      captures[variable] = rowSegment;
+      continue;
+    }
+    if (patternSegment !== rowSegment) return null;
+  }
+  return captures;
+}
+
+function renderTemplateWithCaptures(template: string, captures: Record<string, string>): string {
+  return Object.entries(captures).reduce((result, [name, value]) => result.replaceAll(`{${name}}`, value), template).trim();
 }
 
 function FacetMenu({ title, options, selected, open, onOpen, onClose, onToggle, onClear }: {
@@ -726,8 +1300,8 @@ const PlanCard = memo(function PlanCard({ item: plan, workspace, pending, active
 }) {
   const source = sourceLabel(plan, workspace);
   const docs = plan.metadataSource === 'docs';
-  const showItem = !docs || plan.identifier.toLowerCase() !== plan.title.toLowerCase();
-  const description = docs ? plan.description : plan.description || plan.identifier;
+  const showItem = plan.identifier.toLowerCase() !== plan.title.toLowerCase();
+  const description = plan.description;
   const tags = docs ? plan.tags.filter((tag) => tag !== source && tag !== plan.scope && tag !== plan.identifier) : plan.tags;
   const draggable = isItemDraggable(plan) && !pending;
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {

@@ -166,6 +166,42 @@ cards:
 	}
 }
 
+func TestSourceStructureSettingsSupportNestedItemIdentifierTemplate(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "docs/workspace-settings.yaml", `version: 1
+cards:
+  - pathPattern: "{folder}/{item}"
+    fields:
+      source: docs
+      item: "{folder}/{item}"
+      title: readme_heading
+      status: draft
+      tags: [docs]
+`)
+	writeTestFile(t, root, "docs/a12/prod/README.md", "# Production Profile\n")
+	writeTestFile(t, root, "docs/a12/test/README.md", "# Test Profile\n")
+
+	data, err := New(gitadapter.New()).Scan(models.WorkspaceConfig{
+		ID: "workspace", Name: "Repo", Path: root, BaselineBranch: "main", Sources: []string{"docs"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data.Items) != 2 {
+		t.Fatalf("expected 2 configured cards, got %d (%v)", len(data.Items), data.Warnings)
+	}
+	items := map[string]models.ItemDetail{}
+	for _, item := range data.Items {
+		items[item.Identifier] = item
+	}
+	if _, ok := items["a12/prod"]; !ok {
+		t.Fatalf("expected item identifier a12/prod, got %#v", data.Items)
+	}
+	if _, ok := items["a12/test"]; !ok {
+		t.Fatalf("expected item identifier a12/test, got %#v", data.Items)
+	}
+}
+
 func TestSourceStructureProposalsPreviewRealPaths(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "docs/api/feature/DI-101/README.md", "# DI-101: API Search\n\nSearch docs.\n")
@@ -232,7 +268,7 @@ func TestSourceStructureProposalsExplainTopLevelFolderWithRootMarkdown(t *testin
 		t.Fatal("expected proposals from actual source directories")
 	}
 	first := proposals[0]
-	if first.Label != "Top-level folders" || first.Card.PathPattern != "{item}" {
+	if first.Label != "Item folders" || first.Card.PathPattern != "{item}" {
 		t.Fatalf("unexpected top-level proposal: %#v", first)
 	}
 	if len(first.Preview) != 1 || first.Preview[0].Path != "docs/a12" {

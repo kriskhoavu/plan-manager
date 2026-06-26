@@ -102,8 +102,10 @@ describe('WorkspaceExplorerPage', () => {
   it('keeps Open Kanban explicit for a selected workspace root', async () => {
     const onOpenKanban = vi.fn();
     render(<WorkspaceExplorerPage workspaces={[workspace]} location={{ workspaceId: 'ws' }} onLocationChange={vi.fn()} onOpenKanban={onOpenKanban} />);
+    expect(screen.queryByRole('button', { name: /Open Kanban/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Expand inspector' }));
     fireEvent.click(await screen.findByRole('button', { name: /Open Kanban/i }));
-    expect(onOpenKanban).toHaveBeenCalledWith(workspace);
+    expect(onOpenKanban).toHaveBeenCalledWith(workspace, undefined);
   });
 
   it('searches unloaded paths and opens a result', async () => {

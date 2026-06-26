@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Bell, ChevronDown, KanbanSquare, Moon, Plus, Search, Sun, Boxes, FolderGit2, FolderTree } from 'lucide-react';
+import { Bell, ChevronDown, KanbanSquare, Moon, Plus, Search, Sun, Boxes, FolderGit2, FolderTree, Settings } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 export type { Route } from './app/router';
@@ -7,10 +7,12 @@ export { routeFromLocation } from './app/router';
 import { KanbanPage } from './pages/KanbanPage';
 import { ItemWorkspacePage } from './pages/ItemWorkspacePage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { ActivityPanel } from './components/ReliabilityPanels';
 import { SearchDialog } from './components/SearchDialog';
 import { useQuickSwitcher } from './features/search/hooks';
 import { labels } from './lib/vocabulary';
+import { useAppSettings } from './features/settings/appSettings';
 
 const WorkspaceExplorerPage = lazy(() => import('./pages/WorkspaceExplorerPage').then((module) => ({ default: module.WorkspaceExplorerPage })));
 
@@ -32,6 +34,7 @@ export function App() {
   } = useAppState();
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [appSettings, setAppSettings] = useAppSettings();
   const quickSwitcher = useQuickSwitcher();
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -58,6 +61,11 @@ export function App() {
     setWorkspaceMenuOpen(false);
   };
 
+  const openWorkspaceKanban = (repo: WorkspaceConfig, itemId?: string) => {
+    selectWorkspaceState(repo);
+    navigate({ name: 'kanban', focusedItemId: itemId });
+  };
+
   return (
     <div className="app-shell">
       <aside className="left-nav">
@@ -70,6 +78,7 @@ export function App() {
           <NavButton active={route.name === 'kanban'} onClick={() => navigate({ name: 'kanban' })} icon={<KanbanSquare size={18} />} label="Kanban" />
           <NavButton active={route.name === 'explorer'} onClick={() => navigate({ name: 'explorer' })} icon={<FolderTree size={18} />} label="Explorer" />
           <NavButton active={route.name === 'workspaces'} onClick={() => navigate({ name: 'workspaces' })} icon={<FolderGit2 size={18} />} label={labels.workspaces} />
+          <NavButton active={route.name === 'settings'} onClick={() => navigate({ name: 'settings' })} icon={<Settings size={18} />} label="Settings" />
         </div>
         <div className="workspace-list">
           <span className="workspace-list-label">Workspaces</span>
@@ -163,6 +172,8 @@ export function App() {
           <KanbanPage
             workspace={activeRepo}
             refreshKey={contentRefreshKey}
+            visibleStatuses={appSettings.visibleKanbanStatuses}
+            focusedItemId={route.focusedItemId}
             onOpenPlan={(itemId) => navigate({ name: 'workspace', itemId })}
             onWorkspacesChanged={() => refreshAppData(true)}
             onOpenWorkspaces={() => navigate({ name: 'workspaces' })}
@@ -170,7 +181,8 @@ export function App() {
         )}
         {route.name === 'workspace' && <ItemWorkspacePage itemId={route.itemId} refreshKey={contentRefreshKey} onBack={() => navigate({ name: 'kanban' })} onContentChanged={() => refreshAppStateOnly(true)} />}
         {route.name === 'workspaces' && <WorkspacesPage workspaces={workspaces} onChanged={() => refreshAppData(true)} />}
-        {route.name === 'explorer' && <Suspense fallback={<section className="empty-state">Loading Explorer...</section>}><WorkspaceExplorerPage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenKanban={selectWorkspace} /></Suspense>}
+        {route.name === 'settings' && <SettingsPage settings={appSettings} onChange={setAppSettings} />}
+        {route.name === 'explorer' && <Suspense fallback={<section className="empty-state">Loading Explorer...</section>}><WorkspaceExplorerPage workspaces={workspaces} location={route.location} onLocationChange={(location) => navigate({ name: 'explorer', location })} onOpenKanban={openWorkspaceKanban} /></Suspense>}
       </main>
 
       {showStaleNotice && (
@@ -192,6 +204,7 @@ export function App() {
         <button className={route.name === 'kanban' ? 'active' : ''} onClick={() => navigate({ name: 'kanban' })}><KanbanSquare size={18} />Kanban</button>
         <button className={route.name === 'explorer' ? 'active' : ''} onClick={() => navigate({ name: 'explorer' })}><FolderTree size={18} />Explorer</button>
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>
+        <button className={route.name === 'settings' ? 'active' : ''} onClick={() => navigate({ name: 'settings' })}><Settings size={18} />Settings</button>
       </nav>
     </div>
   );
