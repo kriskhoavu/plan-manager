@@ -3,7 +3,7 @@ import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, 
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { api } from '../lib/api';
-import type { WorkspaceConfig, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult } from '../lib/types';
+import type { WorkspaceConfig, WorkspaceInput, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -32,7 +32,10 @@ type SettingsEditorState = {
 
 export function WorkspacesPage({ workspaces, onChanged }: { workspaces: WorkspaceConfig[]; onChanged: () => void | Promise<void> }) {
   const [name, setName] = useState('Plan Manager');
+  const [registrationMode, setRegistrationMode] = useState<'local_path' | 'remote_clone'>('local_path');
   const [path, setPath] = useState('');
+  const [remoteUrl, setRemoteUrl] = useState('');
+  const [cloneRoot, setCloneRoot] = useState('');
   const [baselineBranch, setBaselineBranch] = useState('main');
   const [sources, setSources] = useState('');
   const [notice, setNotice] = useState<WorkspaceNotice | null>(null);
@@ -48,20 +51,18 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     setBusy(true);
     setNotice(null);
     try {
-      await api.createWorkspace({
-        name,
-        path,
-        baselineBranch,
-        sources: parseSources(sources)
-      });
+      await api.createWorkspace(buildWorkspaceInput({ name, registrationMode, path, remoteUrl, cloneRoot, baselineBranch, sources }));
       setNotice({ tone: 'success', title: 'Workspace registered', details: [name || 'New workspace'] });
       setName('');
+      setRegistrationMode('local_path');
       setPath('');
+      setRemoteUrl('');
+      setCloneRoot('');
       setBaselineBranch('main');
       setSources('');
       onChanged();
     } catch (err) {
-      setNotice({ tone: 'error', title: 'Registration failed', details: [errorMessage(err)] });
+      setNotice({ tone: 'error', title: registrationMode === 'remote_clone' ? 'Remote workspace registration failed' : 'Local workspace registration failed', details: [errorMessage(err)] });
     } finally {
       setBusy(false);
     }
@@ -132,7 +133,9 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
         name: editDraft.name,
         path: editDraft.path,
         baselineBranch: editDraft.baselineBranch,
-        sources: parseSources(editDraft.sources)
+        sources: parseSources(editDraft.sources),
+        registrationMode: repo.registrationMode,
+        remoteUrl: repo.remoteUrl
       });
       setEditingId('');
       setNotice({ tone: 'success', title: 'Workspace updated', details: [editDraft.name || repo.name] });
@@ -165,8 +168,12 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     setNotice(null);
     try {
       const selection = await api.selectDirectory();
-      setPath(selection.path);
-      if (!name || name === 'Plan Manager') {
+      if (registrationMode === 'remote_clone') {
+        setCloneRoot(selection.path);
+      } else {
+        setPath(selection.path);
+      }
+      if ((!name || name === 'Plan Manager') && registrationMode !== 'remote_clone') {
         setName(lastPathSegment(selection.path));
       }
     } catch (err) {
@@ -256,6 +263,11 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   };
 
   const dropPath = (event: DragEvent<HTMLLabelElement>) => {
+    if (registrationMode !== 'local_path') {
+      event.preventDefault();
+      setPathDragging(false);
+      return;
+    }
     event.preventDefault();
     setPathDragging(false);
     const droppedPath = pathFromDrop(event);
@@ -274,7 +286,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       <div className="page-title">
         <div>
           <h1>Workspaces</h1>
-          <span>Register local Git workspaces and scan sources.</span>
+          <span>Register local paths or remote Git URLs, then scan sources.</span>
         </div>
       </div>
 
@@ -285,26 +297,76 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             <h2>Register Workspace</h2>
           </header>
           <label className="repo-field">Workspace Name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Discovery" /></label>
-          <label
-            className={pathDragging ? 'repo-field path-field dragging' : 'repo-field path-field'}
-            onDragOver={(event) => {
-              event.preventDefault();
-              setPathDragging(true);
-            }}
-            onDragLeave={() => setPathDragging(false)}
-            onDrop={dropPath}
-          >
-            Local Path
-            <div className="path-input-row">
-              <input value={path} onChange={(event) => setPath(event.target.value)} placeholder="/Users/me/workspace/repo" />
-              <button className="secondary icon-action" type="button" onClick={browsePath} disabled={busy} title="Browse">
-                <FolderOpen size={16} />
-              </button>
-              <button className="secondary icon-action" type="button" onClick={() => revealPath(path)} disabled={busy || !path} title="Reveal">
-                <ExternalLink size={16} />
-              </button>
-            </div>
-          </label>
+          <div className="registration-mode-toggle" role="radiogroup" aria-label="Workspace registration mode">
+            <button
+              className={registrationMode === 'local_path' ? 'secondary active' : 'secondary'}
+              type="button"
+              role="radio"
+              aria-checked={registrationMode === 'local_path'}
+              onClick={() => {
+                setRegistrationMode('local_path');
+                setPathDragging(false);
+              }}
+            >
+              Local Path
+            </button>
+            <button
+              className={registrationMode === 'remote_clone' ? 'secondary active' : 'secondary'}
+              type="button"
+              role="radio"
+              aria-checked={registrationMode === 'remote_clone'}
+              onClick={() => {
+                setRegistrationMode('remote_clone');
+                setPathDragging(false);
+              }}
+            >
+              Remote Git URL
+            </button>
+          </div>
+          {registrationMode === 'local_path' ? (
+            <label
+              className={pathDragging ? 'repo-field path-field dragging' : 'repo-field path-field'}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setPathDragging(true);
+              }}
+              onDragLeave={() => setPathDragging(false)}
+              onDrop={dropPath}
+            >
+              Local Path
+              <div className="path-input-row">
+                <input value={path} onChange={(event) => setPath(event.target.value)} placeholder="/Users/me/workspace/repo" />
+                <button className="secondary icon-action" type="button" onClick={browsePath} disabled={busy} title="Browse">
+                  <FolderOpen size={16} />
+                </button>
+                <button className="secondary icon-action" type="button" onClick={() => revealPath(path)} disabled={busy || !path} title="Reveal">
+                  <ExternalLink size={16} />
+                </button>
+              </div>
+            </label>
+          ) : (
+            <>
+              <label className="repo-field">Remote Git URL<input value={remoteUrl} onChange={(event) => {
+                const next = event.target.value;
+                setRemoteUrl(next);
+                if (!name || name === 'Plan Manager') {
+                  const inferred = inferWorkspaceNameFromRemoteURL(next);
+                  if (inferred) setName(inferred);
+                }
+              }} placeholder="git@bitbucket.org:team/repo.git" /></label>
+              <label className="repo-field">Clone Root
+                <div className="path-input-row">
+                  <input value={cloneRoot} onChange={(event) => setCloneRoot(event.target.value)} placeholder="/Users/me/workspaces" />
+                  <button className="secondary icon-action" type="button" onClick={browsePath} disabled={busy} title="Browse">
+                    <FolderOpen size={16} />
+                  </button>
+                  <button className="secondary icon-action" type="button" onClick={() => revealPath(cloneRoot)} disabled={busy || !cloneRoot} title="Reveal">
+                    <ExternalLink size={16} />
+                  </button>
+                </div>
+              </label>
+            </>
+          )}
           <div className="repo-field-grid">
             <label className="repo-field">Base Branch<input value={baselineBranch} onChange={(event) => setBaselineBranch(event.target.value)} /></label>
             <SourcesField value={sources} onChange={setSources} />
@@ -350,6 +412,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                   <>
                     <div className="repo-row-main">
                       <h2>{repo.name}</h2>
+                      {repo.registrationMode === 'remote_clone' && repo.remoteUrl && <span className="repo-remote-url" title={repo.remoteUrl}>{repo.remoteUrl}</span>}
                       <button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} disabled={busy} title={repo.path}>{repo.path}</button>
                       <div className="repo-directory-list">
                         {repo.sources.map((directory) => (
@@ -690,6 +753,37 @@ function SourcesField({ value, onChange }: { value: string; onChange: (value: st
       </div>
     </label>
   );
+}
+
+export function buildWorkspaceInput(input: {
+  name: string;
+  registrationMode: 'local_path' | 'remote_clone';
+  path: string;
+  remoteUrl: string;
+  cloneRoot: string;
+  baselineBranch: string;
+  sources: string;
+}): WorkspaceInput {
+  const payload = {
+    name: input.name,
+    baselineBranch: input.baselineBranch,
+    sources: parseSources(input.sources),
+    registrationMode: input.registrationMode
+  } as WorkspaceInput;
+  if (input.registrationMode === 'remote_clone') {
+    payload.remoteUrl = input.remoteUrl.trim();
+    payload.cloneRoot = input.cloneRoot.trim();
+    return payload;
+  }
+  payload.path = input.path.trim();
+  return payload;
+}
+
+export function inferWorkspaceNameFromRemoteURL(remoteUrl: string): string {
+  const value = remoteUrl.trim();
+  if (!value) return '';
+  const parsed = /[:/]([^/:?#]+?)(?:\.git)?$/.exec(value);
+  return parsed?.[1] ?? '';
 }
 
 function pathFromDrop(event: DragEvent<HTMLElement>): string {

@@ -24,7 +24,7 @@ The long-term vision is a local authoring workspace for Git-based planning.
 
 Current capabilities:
 
-- Register local Git workspaces as workspaces.
+- Register workspaces from a local Git path or a remote Git URL (HTTPS/SSH clone to local).
 - Configure one or more sources.
 - Scan structured item roots, configured document roots, and freestyle docs roots.
 - Configure `workspace-settings.yaml` for a source so arbitrary docs layouts can be split into item cards.

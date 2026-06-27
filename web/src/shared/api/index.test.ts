@@ -13,7 +13,17 @@ describe('shared api facade', () => {
     }));
 
     await expect(api.workspaces()).resolves.toEqual([
-      { id: 'w1', name: 'Workspace', path: '/repo', baselineBranch: 'main', createdAt: '2026-06-20T00:00:00Z', sources: [] }
+      {
+        id: 'w1',
+        name: 'Workspace',
+        path: '/repo',
+        baselineBranch: 'main',
+        createdAt: '2026-06-20T00:00:00Z',
+        registrationMode: 'local_path',
+        remoteUrl: '',
+        clonePathManaged: false,
+        sources: []
+      }
     ]);
   });
 

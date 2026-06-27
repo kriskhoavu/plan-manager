@@ -133,6 +133,60 @@ func TestSourceStructureIncludesProposalsAndPreview(t *testing.T) {
 	}
 }
 
+func TestCreateRemoteCloneWorkspace(t *testing.T) {
+	remote := newWorkspaceGitRepo(t)
+	writeWorkspaceGitFile(t, remote, "plans/platform/PM-101/README.md", "# PM-101\n")
+	workspaceGitCommit(t, remote, "seed remote")
+
+	cloneRoot := t.TempDir()
+	dir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
+	service := New(reg, itemindex.New(filepath.Join(dir, "items.yaml")), scanner.New(git), nil, git)
+
+	workspace, err := service.Create(models.WorkspaceInput{
+		Name:             "Remote Workspace",
+		RegistrationMode: models.WorkspaceRegistrationModeRemoteClone,
+		RemoteURL:        "file://" + remote,
+		CloneRoot:        cloneRoot,
+		BaselineBranch:   "main",
+		Sources:          []string{"plans"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if workspace.RegistrationMode != models.WorkspaceRegistrationModeRemoteClone || workspace.RemoteURL != "file://"+remote || !workspace.ClonePathManaged {
+		t.Fatalf("workspace mode metadata = %+v", workspace)
+	}
+	resolvedCloneRoot, _ := filepath.EvalSymlinks(cloneRoot)
+	resolvedWorkspacePath, _ := filepath.EvalSymlinks(workspace.Path)
+	if workspace.Path == remote || !strings.HasPrefix(resolvedWorkspacePath, resolvedCloneRoot) {
+		t.Fatalf("workspace path = %q (%q), remote = %q, cloneRoot = %q (%q)", workspace.Path, resolvedWorkspacePath, remote, cloneRoot, resolvedCloneRoot)
+	}
+	if _, err := os.Stat(filepath.Join(workspace.Path, ".git")); err != nil {
+		t.Fatalf("expected clone to include .git directory: %v", err)
+	}
+}
+
+func TestCreateRemoteCloneWorkspaceRejectsInvalidURL(t *testing.T) {
+	dir := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(dir, "workspaces.yaml"), git)
+	service := New(reg, itemindex.New(filepath.Join(dir, "items.yaml")), scanner.New(git), nil, git)
+
+	_, err := service.Create(models.WorkspaceInput{
+		Name:             "Remote Workspace",
+		RegistrationMode: models.WorkspaceRegistrationModeRemoteClone,
+		RemoteURL:        "not-a-url",
+		CloneRoot:        t.TempDir(),
+		BaselineBranch:   "main",
+		Sources:          []string{"plans"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "remote URL") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestResetSourceStructureRemovesSettingsAndRescans(t *testing.T) {
 	root := newWorkspaceGitRepo(t)
 	writeWorkspaceGitFile(t, root, "docs/workspace-settings.yaml", `version: 1

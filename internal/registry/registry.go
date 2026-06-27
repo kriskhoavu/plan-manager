@@ -38,9 +38,7 @@ func (r *Registry) List() ([]models.WorkspaceConfig, error) {
 	}
 	records := append([]models.WorkspaceConfig(nil), r.records...)
 	for i := range records {
-		if records[i].Sources == nil {
-			records[i].Sources = []string{}
-		}
+		records[i] = normalizeWorkspace(records[i])
 	}
 	return records, nil
 }
@@ -53,7 +51,7 @@ func (r *Registry) Get(id string) (models.WorkspaceConfig, bool, error) {
 	defer r.mu.RUnlock()
 	for _, workspace := range r.records {
 		if workspace.ID == id {
-			return workspace, true, nil
+			return normalizeWorkspace(workspace), true, nil
 		}
 	}
 	return models.WorkspaceConfig{}, false, nil
@@ -76,12 +74,32 @@ func (r *Registry) Create(input models.WorkspaceInput) (models.WorkspaceConfig, 
 		}
 	}
 	r.records = append(r.records, workspace)
-	return workspace, r.saveLocked()
+	return normalizeWorkspace(workspace), r.saveLocked()
 }
 
 func (r *Registry) Update(id string, input models.WorkspaceInput) (models.WorkspaceConfig, error) {
 	if err := r.load(); err != nil {
 		return models.WorkspaceConfig{}, err
+	}
+	var existing models.WorkspaceConfig
+	found := false
+	r.mu.RLock()
+	for _, record := range r.records {
+		if record.ID == id {
+			existing = record
+			found = true
+			break
+		}
+	}
+	r.mu.RUnlock()
+	if !found {
+		return models.WorkspaceConfig{}, fmt.Errorf("workspace not found")
+	}
+	if strings.TrimSpace(string(input.RegistrationMode)) == "" {
+		input.RegistrationMode = existing.RegistrationMode
+	}
+	if strings.TrimSpace(input.RemoteURL) == "" {
+		input.RemoteURL = existing.RemoteURL
 	}
 	workspace, err := r.validate(input)
 	if err != nil {
@@ -102,7 +120,7 @@ func (r *Registry) Update(id string, input models.WorkspaceInput) (models.Worksp
 			workspace.LastScannedAt = existing.LastScannedAt
 			workspace.LastSelectedBranch = existing.LastSelectedBranch
 			r.records[i] = workspace
-			return workspace, r.saveLocked()
+			return normalizeWorkspace(workspace), r.saveLocked()
 		}
 	}
 	return models.WorkspaceConfig{}, fmt.Errorf("workspace not found")
@@ -158,9 +176,23 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 	if name == "" {
 		return models.WorkspaceConfig{}, errors.New("workspace name is required")
 	}
+	mode := normalizeRegistrationMode(input.RegistrationMode)
 	branch := strings.TrimSpace(input.BaselineBranch)
 	if branch == "" {
 		branch = "main"
+	}
+	pathValue := strings.TrimSpace(input.Path)
+	if mode == models.WorkspaceRegistrationModeLocalPath {
+		if pathValue == "" {
+			return models.WorkspaceConfig{}, errors.New("workspace path is required")
+		}
+	} else {
+		if pathValue == "" {
+			return models.WorkspaceConfig{}, errors.New("cloned workspace path is required")
+		}
+		if strings.TrimSpace(input.RemoteURL) == "" {
+			return models.WorkspaceConfig{}, errors.New("remote URL is required")
+		}
 	}
 	path, err := filepath.Abs(expandHome(strings.TrimSpace(input.Path)))
 	if err != nil || path == "" {
@@ -189,13 +221,35 @@ func (r *Registry) validate(input models.WorkspaceInput) (models.WorkspaceConfig
 	}
 
 	return models.WorkspaceConfig{
-		ID:             slug(name) + "-" + shortHash(root),
-		Name:           name,
-		Path:           root,
-		BaselineBranch: branch,
-		Sources:        cleanDirs,
-		CreatedAt:      time.Now().UTC(),
+		ID:               slug(name) + "-" + shortHash(root),
+		Name:             name,
+		Path:             root,
+		BaselineBranch:   branch,
+		RegistrationMode: mode,
+		RemoteURL:        strings.TrimSpace(input.RemoteURL),
+		ClonePathManaged: mode == models.WorkspaceRegistrationModeRemoteClone,
+		Sources:          cleanDirs,
+		CreatedAt:        time.Now().UTC(),
 	}, nil
+}
+
+func normalizeWorkspace(workspace models.WorkspaceConfig) models.WorkspaceConfig {
+	if workspace.Sources == nil {
+		workspace.Sources = []string{}
+	}
+	workspace.RegistrationMode = normalizeRegistrationMode(workspace.RegistrationMode)
+	if workspace.RegistrationMode != models.WorkspaceRegistrationModeRemoteClone {
+		workspace.RemoteURL = ""
+		workspace.ClonePathManaged = false
+	}
+	return workspace
+}
+
+func normalizeRegistrationMode(mode models.WorkspaceRegistrationMode) models.WorkspaceRegistrationMode {
+	if strings.TrimSpace(string(mode)) == string(models.WorkspaceRegistrationModeRemoteClone) {
+		return models.WorkspaceRegistrationModeRemoteClone
+	}
+	return models.WorkspaceRegistrationModeLocalPath
 }
 
 func (r *Registry) load() error {

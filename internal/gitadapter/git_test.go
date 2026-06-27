@@ -108,6 +108,24 @@ func TestTreeReadsBranchSnapshotWithoutCheckout(t *testing.T) {
 	}
 }
 
+func TestCloneClonesRepositoryIntoDestination(t *testing.T) {
+	remote := newGitRepo(t)
+	writeGitFile(t, remote, "plans/platform/PM-201/README.md", "# PM-201\n")
+	gitCommit(t, remote, "seed")
+
+	cloneRoot := t.TempDir()
+	destination := filepath.Join(cloneRoot, "remote-clone")
+	if err := New().Clone("file://"+remote, destination); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(destination, ".git")); err != nil {
+		t.Fatalf("expected .git folder in cloned repository: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(destination, "plans", "platform", "PM-201", "README.md")); err != nil {
+		t.Fatalf("expected seeded README in clone: %v", err)
+	}
+}
+
 func TestParseChangeLine(t *testing.T) {
 	change := parseChangeLine(" M plans/platform/PM-002/README.md")
 	if change.Path != "plans/platform/PM-002/README.md" {

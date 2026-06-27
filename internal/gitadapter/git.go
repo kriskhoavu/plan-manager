@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
@@ -269,7 +270,28 @@ func (g *GitAdapter) SwitchBranch(workspacePath, name string) error {
 	return err
 }
 
+func (g *GitAdapter) Clone(remoteURL, destination string) error {
+	cleanRemote := strings.TrimSpace(remoteURL)
+	cleanDestination := strings.TrimSpace(destination)
+	if cleanRemote == "" {
+		return fmt.Errorf("remote URL is required")
+	}
+	if cleanDestination == "" {
+		return fmt.Errorf("clone destination is required")
+	}
+	parent := filepath.Dir(cleanDestination)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return err
+	}
+	_, err := g.runIn(parent, "clone", "--", cleanRemote, filepath.Base(cleanDestination))
+	return err
+}
+
 func (g *GitAdapter) run(dir string, args ...string) (string, error) {
+	return g.runIn(dir, args...)
+}
+
+func (g *GitAdapter) runIn(dir string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), g.timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)

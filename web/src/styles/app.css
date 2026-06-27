@@ -1945,6 +1945,17 @@ body.is-resizing-drawer {
   font-size: 13px;
 }
 
+.registration-mode-toggle {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.registration-mode-toggle .secondary.active {
+  background: color-mix(in srgb, var(--blue) 10%, var(--panel));
+  border-color: color-mix(in srgb, var(--blue) 45%, var(--line));
+  color: var(--blue);
+}
+
 .repo-field-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
@@ -2036,6 +2047,14 @@ body.is-resizing-drawer {
   background: color-mix(in srgb, var(--panel-soft) 74%, var(--panel));
   padding: 3px 4px 3px 10px;
   color: var(--muted);
+}
+
+.repo-remote-url {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .repo-directory-name {

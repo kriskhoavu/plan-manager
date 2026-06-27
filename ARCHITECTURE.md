@@ -22,7 +22,7 @@ User browser
   -> Go local server
   -> JSON API
   -> Workspace registry and item index in user config dir
-  -> Registered local Git workspaces
+  -> Registered local Git workspaces (from local path or remote clone)
 ```
 
 ## Runtime Architecture
@@ -151,7 +151,7 @@ User browser
 ```text
 User creates workspace
   -> POST /api/workspaces
-  -> registry validates name, path, baseline branch, and sources
+  -> registry validates name, baseline branch, local root path, and sources
   -> Git adapter resolves workspace root and validates branch
   -> registry writes workspaces.yaml
   -> frontend refreshes workspace list
@@ -537,7 +537,21 @@ All endpoints are local and served from `http://127.0.0.1:{port}`.
 ```json
 {
   "name": "discovery",
+  "registrationMode": "local_path",
   "path": "/workspace/discovery",
+  "baselineBranch": "master",
+  "sources": ["plans", "docs"]
+}
+```
+
+Remote-clone example:
+
+```json
+{
+  "name": "discovery",
+  "registrationMode": "remote_clone",
+  "remoteUrl": "git@bitbucket.org:team/discovery.git",
+  "cloneRoot": "/workspace",
   "baselineBranch": "master",
   "sources": ["plans", "docs"]
 }

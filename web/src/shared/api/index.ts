@@ -204,6 +204,9 @@ function normalizeContentSearchResponse(response: WorkspaceContentSearchResponse
 function normalizeWorkspace(workspace: WorkspaceConfig): WorkspaceConfig {
   return {
     ...workspace,
+    registrationMode: workspace.registrationMode === 'remote_clone' ? 'remote_clone' : 'local_path',
+    remoteUrl: workspace.remoteUrl ?? '',
+    clonePathManaged: Boolean(workspace.clonePathManaged),
     sources: Array.isArray(workspace.sources) ? workspace.sources : []
   };
 }

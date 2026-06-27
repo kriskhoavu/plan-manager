@@ -5,8 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -96,6 +98,15 @@ func (s *Service) Get(id string) (models.WorkspaceConfig, bool, error) {
 }
 
 func (s *Service) Create(input models.WorkspaceInput) (models.WorkspaceConfig, error) {
+	mode := normalizeRegistrationMode(input.RegistrationMode)
+	input.RegistrationMode = mode
+	if mode == models.WorkspaceRegistrationModeRemoteClone {
+		resolved, err := s.prepareRemoteClone(input)
+		if err != nil {
+			return models.WorkspaceConfig{}, err
+		}
+		input = resolved
+	}
 	return s.registry.Create(input)
 }
 
@@ -393,4 +404,133 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func (s *Service) prepareRemoteClone(input models.WorkspaceInput) (models.WorkspaceInput, error) {
+	if s.git == nil {
+		s.git = gitadapter.New()
+	}
+	remoteURL := strings.TrimSpace(input.RemoteURL)
+	if !validRemoteURL(remoteURL) {
+		return models.WorkspaceInput{}, fmt.Errorf("remote URL must be a valid HTTPS or SSH Git URL")
+	}
+	cloneRoot, err := resolveCloneRoot(input.CloneRoot)
+	if err != nil {
+		return models.WorkspaceInput{}, err
+	}
+	repoName := remoteRepositoryName(remoteURL)
+	if repoName == "" {
+		return models.WorkspaceInput{}, fmt.Errorf("remote URL must include a repository name")
+	}
+	destination := filepath.Join(cloneRoot, repoName)
+	if err := ensureCloneDestination(destination); err != nil {
+		return models.WorkspaceInput{}, err
+	}
+	if err := s.git.Clone(remoteURL, destination); err != nil {
+		return models.WorkspaceInput{}, fmt.Errorf("clone failed: %w", err)
+	}
+	input.Path = destination
+	input.RemoteURL = remoteURL
+	input.CloneRoot = cloneRoot
+	return input, nil
+}
+
+func resolveCloneRoot(root string) (string, error) {
+	clean := strings.TrimSpace(root)
+	if clean == "" {
+		return "", fmt.Errorf("clone root is required")
+	}
+	clean = expandHome(clean)
+	abs, err := filepath.Abs(clean)
+	if err != nil {
+		return "", fmt.Errorf("clone root is invalid")
+	}
+	stat, err := os.Stat(abs)
+	if err != nil {
+		return "", fmt.Errorf("clone root does not exist")
+	}
+	if !stat.IsDir() {
+		return "", fmt.Errorf("clone root must be a directory")
+	}
+	return abs, nil
+}
+
+func ensureCloneDestination(destination string) error {
+	info, err := os.Stat(destination)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("clone destination already exists and is not a directory")
+	}
+	entries, err := os.ReadDir(destination)
+	if err != nil {
+		return err
+	}
+	if len(entries) > 0 {
+		return fmt.Errorf("clone destination already exists and is not empty")
+	}
+	return nil
+}
+
+func validRemoteURL(raw string) bool {
+	value := strings.TrimSpace(raw)
+	if value == "" || strings.Contains(value, " ") {
+		return false
+	}
+	if parsed, err := url.Parse(value); err == nil {
+		scheme := strings.ToLower(strings.TrimSpace(parsed.Scheme))
+		if (scheme == "https" || scheme == "ssh") && parsed.Host != "" && strings.Trim(parsed.Path, "/") != "" {
+			return true
+		}
+		if scheme == "file" && strings.Trim(parsed.Path, "/") != "" {
+			return true
+		}
+	}
+	scpPattern := regexp.MustCompile(`^[^\s@]+@[^\s:]+:[^\s]+$`)
+	return scpPattern.MatchString(value)
+}
+
+func remoteRepositoryName(remoteURL string) string {
+	trimmed := strings.TrimSpace(remoteURL)
+	if trimmed == "" {
+		return ""
+	}
+	pathPart := ""
+	if parsed, err := url.Parse(trimmed); err == nil && (parsed.Host != "" || strings.ToLower(strings.TrimSpace(parsed.Scheme)) == "file") {
+		pathPart = parsed.Path
+	} else if before, after, ok := strings.Cut(trimmed, ":"); ok && strings.Contains(before, "@") {
+		pathPart = after
+	}
+	pathPart = strings.Trim(pathPart, "/")
+	pathPart = strings.TrimSuffix(pathPart, ".git")
+	base := filepath.Base(filepath.Clean(filepath.FromSlash(pathPart)))
+	if base == "." || base == string(filepath.Separator) {
+		return ""
+	}
+	valid := regexp.MustCompile(`[^a-zA-Z0-9._-]+`).ReplaceAllString(base, "-")
+	valid = strings.Trim(valid, "-._")
+	if valid == "" {
+		return ""
+	}
+	return valid
+}
+
+func normalizeRegistrationMode(mode models.WorkspaceRegistrationMode) models.WorkspaceRegistrationMode {
+	if strings.TrimSpace(string(mode)) == string(models.WorkspaceRegistrationModeRemoteClone) {
+		return models.WorkspaceRegistrationModeRemoteClone
+	}
+	return models.WorkspaceRegistrationModeLocalPath
+}
+
+func expandHome(path string) string {
+	if path == "~" || strings.HasPrefix(path, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, strings.TrimPrefix(path, "~/"))
+		}
+	}
+	return path
 }

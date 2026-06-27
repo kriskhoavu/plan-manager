@@ -199,6 +199,52 @@ func TestRoutesMissingItemReturnsNotFoundJSON(t *testing.T) {
 	}
 }
 
+func TestCreateWorkspaceSupportsRemoteClonePayload(t *testing.T) {
+	remote := t.TempDir()
+	if output, err := exec.Command("git", "init", "-b", "main", remote).CombinedOutput(); err != nil {
+		t.Fatalf("git init remote: %v: %s", err, output)
+	}
+	if err := os.MkdirAll(filepath.Join(remote, "plans"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(remote, "plans", "README.md"), []byte("# Remote\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("git", "-C", remote, "add", ".").CombinedOutput(); err != nil {
+		t.Fatalf("git add remote: %v: %s", err, output)
+	}
+	commit := exec.Command("git", "-C", remote, "commit", "-m", "seed")
+	commit.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com")
+	if output, err := commit.CombinedOutput(); err != nil {
+		t.Fatalf("git commit remote: %v: %s", err, output)
+	}
+
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(t.TempDir(), "workspaces.yaml"), git)
+	idx := itemindex.New(filepath.Join(t.TempDir(), "item-index.yaml"))
+	handler := New(reg, idx, nil, nil, nil, git, nil)
+	cloneRoot := t.TempDir()
+	body := `{"name":"Remote","registrationMode":"remote_clone","remoteUrl":"file://` + remote + `","cloneRoot":"` + cloneRoot + `","baselineBranch":"main","sources":["plans"]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", strings.NewReader(body))
+	res := httptest.NewRecorder()
+	handler.Routes().ServeHTTP(res, req)
+	if res.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
+	}
+	var workspace models.WorkspaceConfig
+	if err := json.Unmarshal(res.Body.Bytes(), &workspace); err != nil {
+		t.Fatal(err)
+	}
+	if workspace.RegistrationMode != models.WorkspaceRegistrationModeRemoteClone || workspace.RemoteURL != "file://"+remote || !workspace.ClonePathManaged {
+		t.Fatalf("workspace = %+v", workspace)
+	}
+	resolvedCloneRoot, _ := filepath.EvalSymlinks(cloneRoot)
+	resolvedWorkspacePath, _ := filepath.EvalSymlinks(workspace.Path)
+	if !strings.HasPrefix(resolvedWorkspacePath, resolvedCloneRoot) {
+		t.Fatalf("workspace path = %q (%q) cloneRoot = %q (%q)", workspace.Path, resolvedWorkspacePath, cloneRoot, resolvedCloneRoot)
+	}
+}
+
 func TestReliabilityEndpointsReturnWorkspaceHealthAndRecentAuditEvents(t *testing.T) {
 	apiHandler, workspace, _, auditStore := reliabilityTestAPI(t)
 	if _, err := auditStore.Append(models.AuditEvent{WorkspaceID: workspace.ID, Operation: "scan", Status: models.AuditStatusSuccess, Message: "Scanned"}); err != nil {

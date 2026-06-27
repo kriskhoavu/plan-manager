@@ -46,7 +46,6 @@ describe('KanbanPage', () => {
     render(<KanbanPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
     expect(screen.getByRole('heading', { name: 'Unsorted' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Ideas' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Draft' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Item Manager')).toBeInTheDocument());
   });

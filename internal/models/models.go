@@ -102,15 +102,25 @@ const (
 var StatusOrder = []ItemStatus{StatusUnsorted, StatusDraft, StatusInProgress, StatusReview, StatusDone}
 
 type WorkspaceConfig struct {
-	ID                 string    `json:"id" yaml:"id"`
-	Name               string    `json:"name" yaml:"name"`
-	Path               string    `json:"path" yaml:"path"`
-	BaselineBranch     string    `json:"baselineBranch" yaml:"baselineBranch"`
-	LastSelectedBranch string    `json:"lastSelectedBranch,omitempty" yaml:"lastSelectedBranch,omitempty"`
-	Sources            []string  `json:"sources" yaml:"sources"`
-	CreatedAt          time.Time `json:"createdAt" yaml:"createdAt"`
-	LastScannedAt      time.Time `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
+	ID                 string                    `json:"id" yaml:"id"`
+	Name               string                    `json:"name" yaml:"name"`
+	Path               string                    `json:"path" yaml:"path"`
+	BaselineBranch     string                    `json:"baselineBranch" yaml:"baselineBranch"`
+	RegistrationMode   WorkspaceRegistrationMode `json:"registrationMode,omitempty" yaml:"registrationMode,omitempty"`
+	RemoteURL          string                    `json:"remoteUrl,omitempty" yaml:"remoteUrl,omitempty"`
+	ClonePathManaged   bool                      `json:"clonePathManaged,omitempty" yaml:"clonePathManaged,omitempty"`
+	LastSelectedBranch string                    `json:"lastSelectedBranch,omitempty" yaml:"lastSelectedBranch,omitempty"`
+	Sources            []string                  `json:"sources" yaml:"sources"`
+	CreatedAt          time.Time                 `json:"createdAt" yaml:"createdAt"`
+	LastScannedAt      time.Time                 `json:"lastScannedAt,omitempty" yaml:"lastScannedAt,omitempty"`
 }
+
+type WorkspaceRegistrationMode string
+
+const (
+	WorkspaceRegistrationModeLocalPath   WorkspaceRegistrationMode = "local_path"
+	WorkspaceRegistrationModeRemoteClone WorkspaceRegistrationMode = "remote_clone"
+)
 
 type BranchScanMetadata struct {
 	WorkspaceID             string        `json:"workspaceId" yaml:"workspaceId"`
@@ -125,10 +135,13 @@ type BranchScanMetadata struct {
 }
 
 type WorkspaceInput struct {
-	Name           string   `json:"name" yaml:"name"`
-	Path           string   `json:"path" yaml:"path"`
-	BaselineBranch string   `json:"baselineBranch" yaml:"baselineBranch"`
-	Sources        []string `json:"sources" yaml:"sources"`
+	Name             string                    `json:"name" yaml:"name"`
+	Path             string                    `json:"path" yaml:"path"`
+	BaselineBranch   string                    `json:"baselineBranch" yaml:"baselineBranch"`
+	Sources          []string                  `json:"sources" yaml:"sources"`
+	RegistrationMode WorkspaceRegistrationMode `json:"registrationMode,omitempty" yaml:"registrationMode,omitempty"`
+	RemoteURL        string                    `json:"remoteUrl,omitempty" yaml:"remoteUrl,omitempty"`
+	CloneRoot        string                    `json:"cloneRoot,omitempty" yaml:"cloneRoot,omitempty"`
 }
 
 type SourceStructureSettings struct {

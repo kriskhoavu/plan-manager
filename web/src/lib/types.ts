@@ -66,6 +66,9 @@ export interface WorkspaceConfig {
   name: string;
   path: string;
   baselineBranch: string;
+  registrationMode?: 'local_path' | 'remote_clone';
+  remoteUrl?: string;
+  clonePathManaged?: boolean;
   lastSelectedBranch?: string;
   sources: string[];
   createdAt: string;
@@ -74,9 +77,12 @@ export interface WorkspaceConfig {
 
 export interface WorkspaceInput {
   name: string;
-  path: string;
+  path?: string;
   baselineBranch: string;
   sources: string[];
+  registrationMode?: 'local_path' | 'remote_clone';
+  remoteUrl?: string;
+  cloneRoot?: string;
 }
 
 export interface SourceStructureSettings {

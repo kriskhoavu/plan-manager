@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applySegmentRole, inferCompatibilityFields, normalizeDroppedPath, parseSources, previewPathSegments, settingsEditorFromResult } from './WorkspacesPage';
+import { applySegmentRole, buildWorkspaceInput, inferCompatibilityFields, inferWorkspaceNameFromRemoteURL, normalizeDroppedPath, parseSources, previewPathSegments, settingsEditorFromResult } from './WorkspacesPage';
 
 describe('normalizeDroppedPath', () => {
   it('decodes file URLs dropped onto the path field', () => {
@@ -18,6 +18,55 @@ describe('parseSources', () => {
 
   it('deduplicates and ignores empty entries', () => {
     expect(parseSources('plans, , docs, plans')).toEqual(['plans', 'docs']);
+  });
+});
+
+describe('buildWorkspaceInput', () => {
+  it('builds local mode payload with path', () => {
+    expect(buildWorkspaceInput({
+      name: 'Local',
+      registrationMode: 'local_path',
+      path: '/repo',
+      remoteUrl: '',
+      cloneRoot: '',
+      baselineBranch: 'main',
+      sources: 'plans, docs'
+    })).toEqual({
+      name: 'Local',
+      registrationMode: 'local_path',
+      path: '/repo',
+      baselineBranch: 'main',
+      sources: ['plans', 'docs']
+    });
+  });
+
+  it('builds remote mode payload with URL and clone root', () => {
+    expect(buildWorkspaceInput({
+      name: 'Remote',
+      registrationMode: 'remote_clone',
+      path: '/ignored',
+      remoteUrl: ' git@bitbucket.org:team/repo.git ',
+      cloneRoot: ' /Users/me/workspaces ',
+      baselineBranch: 'develop',
+      sources: 'plans'
+    })).toEqual({
+      name: 'Remote',
+      registrationMode: 'remote_clone',
+      remoteUrl: 'git@bitbucket.org:team/repo.git',
+      cloneRoot: '/Users/me/workspaces',
+      baselineBranch: 'develop',
+      sources: ['plans']
+    });
+  });
+});
+
+describe('inferWorkspaceNameFromRemoteURL', () => {
+  it('infers name from SSH URLs', () => {
+    expect(inferWorkspaceNameFromRemoteURL('git@bitbucket.org:team/plan-manager.git')).toBe('plan-manager');
+  });
+
+  it('infers name from HTTPS URLs', () => {
+    expect(inferWorkspaceNameFromRemoteURL('https://bitbucket.org/team/repo')).toBe('repo');
   });
 });
 
