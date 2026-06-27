@@ -177,38 +177,96 @@ Build the app binary:
 go build -o ./bin/plan-manager ./cmd/plan-manager
 ```
 
-## Data Location
+## Data Directory, Bootstrap, and Settings Files
 
-Plan Manager stores its app data in the OS user config directory:
+Plan Manager stores app-owned state in one logical data directory under the current user.
 
-```text
-<user-config-dir>/plan-manager/
-  workspaces.yaml
-  item-index.yaml
-  audit-log.jsonl
-  saved-filters.yaml
-  recent-items.yaml
-```
-
-Examples:
+Default per OS (resolved with `os.UserConfigDir()`):
 
 - macOS: `~/Library/Application Support/plan-manager/`
 - Linux: usually `~/.config/plan-manager/`
 - Windows: usually `%AppData%\plan-manager\`
 
-Registered workspaces are not used for app registry or cache storage. Plan Manager writes to them only when the user edits Markdown, changes metadata or status, creates an item, saves source item settings, commits, pulls, pushes, or runs a branch operation.
+### Effective Data Directory Resolution
 
-Each structured plan uses a minimal `plan.yaml` as its metadata source:
+At startup, Plan Manager resolves the active data directory in this order:
+
+1. `PLAN_MANAGER_DATA_DIR` environment variable (highest priority)
+2. `bootstrap.yaml` override in the default OS data directory
+3. default OS data directory
+
+When changed from the Workspaces page, the override is stored in:
+
+```text
+<default-os-data-dir>/bootstrap.yaml
+```
+
+Example content:
+
+```yaml
+dataDir: /Users/me/.plan-manager-data
+```
+
+Changing `dataDir` requires restarting Plan Manager to fully switch runtime services.
+
+### Data Directory Structure
+
+```text
+<effective-data-dir>/
+  bootstrap.yaml        # optional override file (usually in default OS data dir)
+  workspaces.yaml       # registered workspaces
+  item-index.yaml       # indexed item summary cache
+  audit-log.jsonl       # append-only operation audit events
+  saved-filters.yaml    # saved Kanban filter views
+  recent-items.yaml     # recent item navigation history
+  clone-root/           # default root for remote-cloned repositories
+```
+
+### Purpose of Each Settings File
+
+| File                       | Scope                     | Location                                                                                                  | Purpose                                                                          |
+|----------------------------|---------------------------|-----------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|
+| `bootstrap.yaml`           | App bootstrap             | `<default-os-data-dir>/bootstrap.yaml`                                                                    | Stores app-level `dataDir` override used before main stores are opened           |
+| `workspaces.yaml`          | App runtime               | `<effective-data-dir>/workspaces.yaml`                                                                    | Workspace registry (name, path, baseline branch, sources, mode metadata)         |
+| `item-index.yaml`          | App runtime               | `<effective-data-dir>/item-index.yaml`                                                                    | Cached scan/index state for fast Kanban and search loading                       |
+| `saved-filters.yaml`       | App runtime               | `<effective-data-dir>/saved-filters.yaml`                                                                 | User-saved filter presets                                                        |
+| `recent-items.yaml`        | App runtime               | `<effective-data-dir>/recent-items.yaml`                                                                  | User recent item links                                                           |
+| `audit-log.jsonl`          | App runtime               | `<effective-data-dir>/audit-log.jsonl`                                                                    | Local operation history (`success`/`blocked`/`failed`)                           |
+| `workspace-settings.yaml`  | Workspace source          | `<workspace-path>/<source>/workspace-settings.yaml`                                                       | Optional source-structure rules for mapping arbitrary docs layout to cards       |
+| `repository-settings.yaml` | Workspace source (legacy) | `<workspace-path>/<source>/repository-settings.yaml`                                                      | Legacy alias of `workspace-settings.yaml` still read for compatibility           |
+| `plan.yaml`                | Plan/item directory       | `<workspace-path>/<source>/<scope>/<identifier>/plan.yaml` (or equivalent item directory for that source) | Plan metadata (`status`, optional owner/tags/title, optional document overrides) |
+
+### `plan.yaml` Structure
+
+Minimal typical form:
 
 ```yaml
 plan:
-  status: done
-  tags: [backend, frontend]
+  status: draft
 ```
 
-The scanner infers identity from the directory path, title from `README.md`, and document metadata from conventional Markdown paths. `title` is needed only when it intentionally differs from the README heading; `owner` and `tags` are optional.
+Common extended form:
 
-Sources may also contain an optional `workspace-settings.yaml`. This file is owned by the workspace and describes how a non-standard source root should be split into item cards. The conceptual fields are `source` and `item`; the legacy `repository-settings.yaml`, `service`, `ticket`, and `planDirectories` names are read for migration compatibility:
+```yaml
+plan:
+  status: review
+  owner: platform-team
+  tags: [ backend, api ]
+  title: API Contract Cleanup
+documents:
+  - path: design/design-01-backend.md
+    role: design
+    track: backend
+    label: Backend Design
+```
+
+Notes:
+
+- Identity (`scope`, `identifier`) is normally inferred from folder path.
+- Title is usually inferred from `README.md` heading.
+- Document metadata is inferred from conventional paths unless overridden.
+
+### `workspace-settings.yaml` Structure (custom docs mapping)
 
 ```yaml
 version: 1
@@ -222,7 +280,11 @@ cards:
       tags: [docs]
 ```
 
-If the settings file is missing or invalid, the scanner falls back to the existing freestyle docs behavior.
+If `workspace-settings.yaml` is missing or invalid, scanner behavior falls back to freestyle docs handling.
+
+Registered workspaces are not used for app registry or cache storage. Plan Manager writes to workspaces only when the
+user edits Markdown, changes metadata or status, creates an item, saves source settings, commits, pulls, pushes, or runs
+a branch operation.
 
 ## Current Safety Model
 

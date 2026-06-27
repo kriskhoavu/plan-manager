@@ -1,9 +1,9 @@
-import { type DragEvent, type Dispatch, type FormEvent, type SetStateAction, useState } from 'react';
+import { type DragEvent, type Dispatch, type FormEvent, type SetStateAction, useEffect, useState } from 'react';
 import { CheckCircle2, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { api } from '../lib/api';
-import type { WorkspaceConfig, WorkspaceInput, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult } from '../lib/types';
+import type { WorkspaceConfig, WorkspaceInput, SourceStructureSettings, SourceStructureCard, SourceStructurePreview, SourceStructureProposal, SourceSettingsResult, ScanResult, SystemConfigPaths } from '../lib/types';
 import { labels } from '../lib/vocabulary';
 import { applySegmentRole, inferCompatibilityFields, lastPathSegment, normalizeDroppedPath, parseSources, previewPathSegments } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -38,6 +38,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [cloneRoot, setCloneRoot] = useState('');
   const [baselineBranch, setBaselineBranch] = useState('main');
   const [sources, setSources] = useState('');
+  const [systemConfig, setSystemConfig] = useState<SystemConfigPaths | null>(null);
+  const [dataDirDraft, setDataDirDraft] = useState('');
   const [notice, setNotice] = useState<WorkspaceNotice | null>(null);
   const [busy, setBusy] = useState(false);
   const [pathDragging, setPathDragging] = useState(false);
@@ -45,6 +47,19 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [editDraft, setEditDraft] = useState({ name: '', path: '', baselineBranch: '', sources: '' });
   const [repoToRemove, setRepoToRemove] = useState<WorkspaceConfig | null>(null);
   const [settingsEditor, setSettingsEditor] = useState<SettingsEditorState | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void api.systemConfigPaths().then((result) => {
+      if (!active) return;
+      setSystemConfig(result);
+      setDataDirDraft(result.dataDir);
+      setCloneRoot((current) => current || result.cloneRootDir);
+    }).catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -57,7 +72,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       setRegistrationMode('local_path');
       setPath('');
       setRemoteUrl('');
-      setCloneRoot('');
+      setCloneRoot(systemConfig?.cloneRootDir ?? '');
       setBaselineBranch('main');
       setSources('');
       onChanged();
@@ -168,14 +183,23 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     setNotice(null);
     try {
       const selection = await api.selectDirectory();
-      if (registrationMode === 'remote_clone') {
-        setCloneRoot(selection.path);
-      } else {
-        setPath(selection.path);
-      }
-      if ((!name || name === 'Plan Manager') && registrationMode !== 'remote_clone') {
+      setPath(selection.path);
+      if (!name || name === 'Plan Manager') {
         setName(lastPathSegment(selection.path));
       }
+    } catch (err) {
+      setNotice({ tone: 'error', title: 'Directory selection failed', details: [errorMessage(err)] });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const browseDataDir = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const selection = await api.selectDirectory();
+      setDataDirDraft(selection.path);
     } catch (err) {
       setNotice({ tone: 'error', title: 'Directory selection failed', details: [errorMessage(err)] });
     } finally {
@@ -190,6 +214,26 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       await api.openPath(targetPath);
     } catch (err) {
       setNotice({ tone: 'error', title: 'Path failed to open', details: [errorMessage(err)] });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveDataDir = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const updated = await api.updateSystemConfigPaths({ dataDir: dataDirDraft.trim() });
+      setSystemConfig(updated);
+      setDataDirDraft(updated.dataDir);
+      setCloneRoot(updated.cloneRootDir);
+      setNotice({
+        tone: 'info',
+        title: 'Data directory updated',
+        details: ['Restart Plan Manager to apply workspace registry and index paths.', `Managed clone root: ${updated.cloneRootDir}`]
+      });
+    } catch (err) {
+      setNotice({ tone: 'error', title: 'Data directory update failed', details: [errorMessage(err)] });
     } finally {
       setBusy(false);
     }
@@ -291,12 +335,40 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       </div>
 
       <div className="workspaces-layout">
-        <form className="repo-form repo-create-panel" onSubmit={submit}>
-          <header>
-            <FolderGit2 size={18} />
-            <h2>Register Workspace</h2>
-          </header>
-          <label className="repo-field">Workspace Name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Discovery" /></label>
+        <div className="workspaces-left-column">
+          {systemConfig && (
+            <section className="repo-create-panel data-dir-panel">
+              <header>
+                <FolderOpen size={18} />
+                <h2>Data Directory</h2>
+              </header>
+              <label className="repo-field">Path
+                <div className="path-input-row">
+                  <input value={dataDirDraft} onChange={(event) => setDataDirDraft(event.target.value)} placeholder={systemConfig.defaultDataDir} />
+                  <button className="secondary icon-action" type="button" onClick={browseDataDir} disabled={busy} title="Browse">
+                    <FolderOpen size={16} />
+                  </button>
+                  <button className="secondary icon-action" type="button" onClick={() => revealPath(dataDirDraft)} disabled={busy || !dataDirDraft} title="Reveal">
+                    <ExternalLink size={16} />
+                  </button>
+                </div>
+              </label>
+              <div className="system-config-note">
+                <span>Where Plan Manager stores app data and default cloned repositories.</span>
+              </div>
+              <button className="primary repo-submit" type="button" onClick={() => void saveDataDir()} disabled={busy || !dataDirDraft.trim()}>
+                <FolderOpen size={16} />
+                Save
+              </button>
+            </section>
+          )}
+
+          <form className="repo-form repo-create-panel" onSubmit={submit}>
+            <header>
+              <FolderGit2 size={18} />
+              <h2>Register Workspace</h2>
+            </header>
+            <label className="repo-field">Workspace Name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Discovery" /></label>
           <div className="registration-mode-toggle" role="radiogroup" aria-label="Workspace registration mode">
             <button
               className={registrationMode === 'local_path' ? 'secondary active' : 'secondary'}
@@ -318,6 +390,9 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
               onClick={() => {
                 setRegistrationMode('remote_clone');
                 setPathDragging(false);
+                if (!cloneRoot && systemConfig?.cloneRootDir) {
+                  setCloneRoot(systemConfig.cloneRootDir);
+                }
               }}
             >
               Remote Git URL
@@ -356,7 +431,11 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
               }} placeholder="git@bitbucket.org:team/repo.git" /></label>
               <label className="repo-field">Clone Root
                 <div className="path-input-row">
-                  <input value={cloneRoot} onChange={(event) => setCloneRoot(event.target.value)} placeholder="/Users/me/workspaces" />
+                  <input
+                    value={cloneRoot}
+                    onChange={(event) => setCloneRoot(event.target.value)}
+                    placeholder={systemConfig?.cloneRootDir ?? '/path/to/plan-manager/clone-root'}
+                  />
                   <button className="secondary icon-action" type="button" onClick={browsePath} disabled={busy} title="Browse">
                     <FolderOpen size={16} />
                   </button>
@@ -365,6 +444,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                   </button>
                 </div>
               </label>
+              {systemConfig && <span className="repo-remote-default">Default clone root: {systemConfig.cloneRootDir}</span>}
             </>
           )}
           <div className="repo-field-grid">
@@ -372,7 +452,8 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             <SourcesField value={sources} onChange={setSources} />
           </div>
           <button className="primary repo-submit" disabled={busy}><FolderGit2 size={16} /> Register Workspace</button>
-        </form>
+          </form>
+        </div>
 
         <div className="repo-list-panel">
           <header>
@@ -772,7 +853,9 @@ export function buildWorkspaceInput(input: {
   } as WorkspaceInput;
   if (input.registrationMode === 'remote_clone') {
     payload.remoteUrl = input.remoteUrl.trim();
-    payload.cloneRoot = input.cloneRoot.trim();
+    if (input.cloneRoot.trim()) {
+      payload.cloneRoot = input.cloneRoot.trim();
+    }
     return payload;
   }
   payload.path = input.path.trim();

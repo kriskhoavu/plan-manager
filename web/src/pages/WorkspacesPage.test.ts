@@ -46,14 +46,14 @@ describe('buildWorkspaceInput', () => {
       registrationMode: 'remote_clone',
       path: '/ignored',
       remoteUrl: ' git@bitbucket.org:team/repo.git ',
-      cloneRoot: ' /Users/me/workspaces ',
+      cloneRoot: ' /Users/me/Library/Application Support/plan-manager/clone-root ',
       baselineBranch: 'develop',
       sources: 'plans'
     })).toEqual({
       name: 'Remote',
       registrationMode: 'remote_clone',
       remoteUrl: 'git@bitbucket.org:team/repo.git',
-      cloneRoot: '/Users/me/workspaces',
+      cloneRoot: '/Users/me/Library/Application Support/plan-manager/clone-root',
       baselineBranch: 'develop',
       sources: ['plans']
     });

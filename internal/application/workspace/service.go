@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"plan-manager/internal/application/apperrors"
+	"plan-manager/internal/config"
 	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemindex"
 	"plan-manager/internal/itemwriter"
@@ -438,7 +439,11 @@ func (s *Service) prepareRemoteClone(input models.WorkspaceInput) (models.Worksp
 func resolveCloneRoot(root string) (string, error) {
 	clean := strings.TrimSpace(root)
 	if clean == "" {
-		return "", fmt.Errorf("clone root is required")
+		paths, err := config.ResolvePaths()
+		if err != nil {
+			return "", err
+		}
+		clean = paths.CloneRootDir
 	}
 	clean = expandHome(clean)
 	abs, err := filepath.Abs(clean)

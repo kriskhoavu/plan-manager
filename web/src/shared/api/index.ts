@@ -36,8 +36,9 @@ import type {
   WorkspacePathMutationResult,
   WorkspacePathRenameInput,
   WorkspacePathSearchResponse,
-	WorkspaceContentSearchResponse,
+  WorkspaceContentSearchResponse,
   WorkspaceTreeEntry,
+  SystemConfigPaths,
   SourceStructureSettings,
   ScanResult,
   SourceSettingsResult,
@@ -149,6 +150,9 @@ export const api = {
     request<WorkspaceFileWriteResult>(`/api/workspaces/${encodeURIComponent(workspaceId)}/files/revert`, { method: 'POST', body: JSON.stringify(input) }),
   selectDirectory: () => request<PathSelection>('/api/system/select-directory', { method: 'POST' }),
   openPath: (path: string) => request<{ ok: boolean }>('/api/system/open-path', { method: 'POST', body: JSON.stringify({ path }) }),
+  systemConfigPaths: () => request<SystemConfigPaths>('/api/system/config-paths').then(normalizeSystemConfigPaths),
+  updateSystemConfigPaths: (input: { dataDir: string }) =>
+    request<SystemConfigPaths>('/api/system/config-paths', { method: 'PUT', body: JSON.stringify(input) }).then(normalizeSystemConfigPaths),
   items: async (params: URLSearchParams) => ((await request<ItemSummary[] | null>(`/api/items?${params.toString()}`)) ?? []).map(normalizeItem),
   item: async (id: string) => normalizeItemDetail(await request<ItemDetail>(`/api/items/${id}`)),
   files: async (id: string) => (await request<FileNode[] | null>(`/api/items/${id}/files`)) ?? [],
@@ -208,6 +212,15 @@ function normalizeWorkspace(workspace: WorkspaceConfig): WorkspaceConfig {
     remoteUrl: workspace.remoteUrl ?? '',
     clonePathManaged: Boolean(workspace.clonePathManaged),
     sources: Array.isArray(workspace.sources) ? workspace.sources : []
+  };
+}
+
+function normalizeSystemConfigPaths(input: SystemConfigPaths): SystemConfigPaths {
+  return {
+    dataDir: input.dataDir ?? '',
+    defaultDataDir: input.defaultDataDir ?? '',
+    cloneRootDir: input.cloneRootDir ?? '',
+    restartRequired: Boolean(input.restartRequired)
   };
 }
 

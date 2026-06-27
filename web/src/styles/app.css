@@ -1853,6 +1853,12 @@ body.is-resizing-drawer {
   align-items: stretch;
 }
 
+.workspaces-left-column {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
 .repo-create-panel,
 .repo-list-panel {
   background: var(--panel);
@@ -1950,6 +1956,26 @@ body.is-resizing-drawer {
   gap: 8px;
 }
 
+.system-config-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 10px;
+}
+
+.data-dir-panel {
+  gap: 10px;
+}
+
+.system-config-note {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .registration-mode-toggle .secondary.active {
   background: color-mix(in srgb, var(--blue) 10%, var(--panel));
   border-color: color-mix(in srgb, var(--blue) 45%, var(--line));
@@ -2018,7 +2044,9 @@ body.is-resizing-drawer {
 }
 
 .repo-submit {
-  justify-self: start;
+  width: 100%;
+  justify-self: stretch;
+  justify-content: center;
 }
 
 .directory-chips,
@@ -2055,6 +2083,11 @@ body.is-resizing-drawer {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.repo-remote-default {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .repo-directory-name {

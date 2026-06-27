@@ -85,6 +85,13 @@ export interface WorkspaceInput {
   cloneRoot?: string;
 }
 
+export interface SystemConfigPaths {
+  dataDir: string;
+  defaultDataDir: string;
+  cloneRootDir: string;
+  restartRequired?: boolean;
+}
+
 export interface SourceStructureSettings {
   version: number;
   cards: SourceStructureCard[];

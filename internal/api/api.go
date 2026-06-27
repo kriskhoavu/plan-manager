@@ -21,6 +21,7 @@ import (
 	appworkspace "plan-manager/internal/application/workspace"
 	appworkspacefiles "plan-manager/internal/application/workspacefiles"
 	"plan-manager/internal/audit"
+	"plan-manager/internal/config"
 	"plan-manager/internal/fileaccess"
 	"plan-manager/internal/gitadapter"
 	"plan-manager/internal/itemindex"
@@ -127,6 +128,8 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("POST /api/workspaces/{id}/git/switch", a.gitSwitchBranch)
 	mux.HandleFunc("POST /api/system/select-directory", a.selectDirectory)
 	mux.HandleFunc("POST /api/system/open-path", a.openPath)
+	mux.HandleFunc("GET /api/system/config-paths", a.systemConfigPaths)
+	mux.HandleFunc("PUT /api/system/config-paths", a.updateSystemConfigPaths)
 	return mux
 }
 
@@ -752,6 +755,40 @@ func (a *API) openPath(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *API) systemConfigPaths(w http.ResponseWriter, r *http.Request) {
+	paths, err := config.ResolvePaths()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"dataDir":        paths.Dir,
+		"defaultDataDir": paths.DefaultDir,
+		"cloneRootDir":   paths.CloneRootDir,
+	})
+}
+
+func (a *API) updateSystemConfigPaths(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		DataDir string `json:"dataDir"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	paths, err := config.SetDataDir(input.DataDir)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"dataDir":         paths.Dir,
+		"defaultDataDir":  paths.DefaultDir,
+		"cloneRootDir":    paths.CloneRootDir,
+		"restartRequired": true,
+	})
 }
 
 func nonNilWarnings(warnings []models.ScanWarning) []models.ScanWarning {
