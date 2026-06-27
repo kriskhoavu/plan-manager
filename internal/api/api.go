@@ -88,6 +88,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("POST /api/recent-items", a.recordRecentItem)
 	mux.HandleFunc("GET /api/workspaces", a.listWorkspaces)
 	mux.HandleFunc("POST /api/workspaces", a.createWorkspace)
+	mux.HandleFunc("POST /api/workspaces/stream-create", a.createWorkspaceStream)
 	mux.HandleFunc("PUT /api/workspaces/{id}", a.updateWorkspace)
 	mux.HandleFunc("DELETE /api/workspaces/{id}", a.deleteWorkspace)
 	mux.HandleFunc("POST /api/workspaces/{id}/scan", a.scanWorkspace)
@@ -311,12 +312,52 @@ func (a *API) createWorkspace(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	workspace, err := a.workspaces.Create(input)
+	result, err := a.workspaces.CreateWithResult(input)
 	if err != nil {
+		if strings.TrimSpace(result.OperationLog) != "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error(), "operationLog": result.OperationLog})
+			return
+		}
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, workspace)
+	if strings.TrimSpace(result.OperationLog) == "" {
+		writeJSON(w, http.StatusCreated, result.Workspace)
+		return
+	}
+	writeJSON(w, http.StatusCreated, result)
+}
+
+func (a *API) createWorkspaceStream(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming is not supported")
+		return
+	}
+	var input models.WorkspaceInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	writeSSE(w, "start", map[string]any{"ok": true})
+	flusher.Flush()
+	result, err := a.workspaces.CreateWithResultStreaming(input, func(chunk string) {
+		if strings.TrimSpace(chunk) == "" {
+			return
+		}
+		writeSSE(w, "log", map[string]any{"chunk": chunk})
+		flusher.Flush()
+	})
+	if err != nil {
+		writeSSE(w, "error", map[string]any{"error": err.Error(), "operationLog": result.OperationLog})
+		flusher.Flush()
+		return
+	}
+	writeSSE(w, "result", result)
+	flusher.Flush()
 }
 
 func (a *API) updateWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -902,6 +943,15 @@ func statusForErrorFromResult(result models.GitOperationResult) int {
 		return http.StatusBadRequest
 	}
 	return http.StatusOK
+}
+
+func writeSSE(w http.ResponseWriter, event string, data any) {
+	payload, _ := json.Marshal(data)
+	_, _ = fmt.Fprintf(w, "event: %s\n", event)
+	for _, line := range strings.Split(string(payload), "\n") {
+		_, _ = fmt.Fprintf(w, "data: %s\n", line)
+	}
+	_, _ = fmt.Fprint(w, "\n")
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

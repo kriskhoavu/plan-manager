@@ -231,12 +231,19 @@ func TestCreateWorkspaceSupportsRemoteClonePayload(t *testing.T) {
 	if res.Code != http.StatusCreated {
 		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
 	}
-	var workspace models.WorkspaceConfig
-	if err := json.Unmarshal(res.Body.Bytes(), &workspace); err != nil {
+	var payload struct {
+		Workspace    models.WorkspaceConfig `json:"workspace"`
+		OperationLog string                 `json:"operationLog"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
+	workspace := payload.Workspace
 	if workspace.RegistrationMode != models.WorkspaceRegistrationModeRemoteClone || workspace.RemoteURL != "file://"+remote || !workspace.ClonePathManaged {
 		t.Fatalf("workspace = %+v", workspace)
+	}
+	if strings.TrimSpace(payload.OperationLog) == "" {
+		t.Fatalf("expected clone operation log in response: %s", res.Body.String())
 	}
 	resolvedCloneRoot, _ := filepath.EvalSymlinks(cloneRoot)
 	resolvedWorkspacePath, _ := filepath.EvalSymlinks(workspace.Path)

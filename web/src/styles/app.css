@@ -1854,9 +1854,14 @@ body.is-resizing-drawer {
 }
 
 .workspaces-left-column {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  align-content: start;
+  min-height: 100%;
+}
+
+.workspaces-left-column .repo-form {
+  flex: 1;
 }
 
 .repo-create-panel,
@@ -2088,6 +2093,25 @@ body.is-resizing-drawer {
 .repo-remote-default {
   color: var(--muted);
   font-size: 12px;
+}
+
+.registration-log-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.registration-log-panel pre {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-soft) 75%, var(--panel));
+  color: var(--text);
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .repo-directory-name {

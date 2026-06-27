@@ -85,6 +85,11 @@ export interface WorkspaceInput {
   cloneRoot?: string;
 }
 
+export interface WorkspaceCreateResult {
+  workspace: WorkspaceConfig;
+  operationLog?: string;
+}
+
 export interface SystemConfigPaths {
   dataDir: string;
   defaultDataDir: string;

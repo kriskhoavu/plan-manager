@@ -22,6 +22,7 @@ import type {
   ItemStatusUpdateInput,
   ItemSummary,
   WorkspaceConfig,
+  WorkspaceCreateResult,
   WorkspaceBranches,
   WorkspaceInput,
   WorkspaceHealth,
@@ -47,11 +48,13 @@ import type {
 
 export class ApiError extends Error {
   recoveryHint?: string;
+  operationLog?: string;
 
-  constructor(message: string, recoveryHint?: string) {
+  constructor(message: string, recoveryHint?: string, operationLog?: string) {
     super(message);
     this.name = 'ApiError';
     this.recoveryHint = recoveryHint;
+    this.operationLog = operationLog;
   }
 }
 
@@ -65,7 +68,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new ApiError(payload.error ?? payload.message ?? `Request failed: ${res.status}`, payload.recoveryHint);
+    throw new ApiError(payload.error ?? payload.message ?? `Request failed: ${res.status}`, payload.recoveryHint, payload.operationLog);
   }
   return payload as T;
 }
@@ -93,7 +96,61 @@ export const api = {
     return ((await request<AuditEvent[] | null>(`/api/audit-events${suffix}`)) ?? []).map(normalizeAuditEvent);
   },
   workspaces: async () => ((await request<WorkspaceConfig[] | null>('/api/workspaces')) ?? []).map(normalizeWorkspace),
-  createWorkspace: (input: WorkspaceInput) => request<WorkspaceConfig>('/api/workspaces', { method: 'POST', body: JSON.stringify(input) }),
+  createWorkspace: async (input: WorkspaceInput) => {
+    const payload = await request<WorkspaceConfig | WorkspaceCreateResult>('/api/workspaces', { method: 'POST', body: JSON.stringify(input) });
+    if (isWorkspaceCreateResult(payload)) {
+      return {
+        workspace: normalizeWorkspace(payload.workspace),
+        operationLog: payload.operationLog ?? ''
+      };
+    }
+    return {
+      workspace: normalizeWorkspace(payload),
+      operationLog: ''
+    };
+  },
+  createWorkspaceStream: async (input: WorkspaceInput, onLog: (chunk: string) => void) => {
+    const res = await fetch('/api/workspaces/stream-create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    if (!res.ok || !res.body) {
+      const payload = await res.json().catch(() => ({}));
+      throw new ApiError(payload.error ?? `Request failed: ${res.status}`, payload.recoveryHint, payload.operationLog);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let result: { workspace?: WorkspaceConfig; operationLog?: string } = {};
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const messages = buffer.split('\n\n');
+      buffer = messages.pop() ?? '';
+      for (const raw of messages) {
+        const parsed = parseSSEMessage(raw);
+        if (!parsed) continue;
+        if (parsed.event === 'log' && typeof parsed.data?.chunk === 'string') {
+          onLog(parsed.data.chunk);
+        }
+        if (parsed.event === 'error') {
+          throw new ApiError(parsed.data?.error ?? 'Workspace registration failed', undefined, parsed.data?.operationLog ?? '');
+        }
+        if (parsed.event === 'result') {
+          result = parsed.data ?? {};
+        }
+      }
+    }
+    if (!result.workspace) {
+      throw new ApiError('Workspace registration failed');
+    }
+    return {
+      workspace: normalizeWorkspace(result.workspace),
+      operationLog: result.operationLog ?? ''
+    };
+  },
   updateWorkspace: (id: string, input: WorkspaceInput) => request<WorkspaceConfig>(`/api/workspaces/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteWorkspace: (id: string) => request<{ ok: boolean }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
   scan: (workspaceId: string) => request<ScanResult>(`/api/workspaces/${workspaceId}/scan`, { method: 'POST' }),
@@ -222,6 +279,24 @@ function normalizeSystemConfigPaths(input: SystemConfigPaths): SystemConfigPaths
     cloneRootDir: input.cloneRootDir ?? '',
     restartRequired: Boolean(input.restartRequired)
   };
+}
+
+function isWorkspaceCreateResult(input: WorkspaceConfig | WorkspaceCreateResult): input is WorkspaceCreateResult {
+  return typeof (input as WorkspaceCreateResult).workspace === 'object' && (input as WorkspaceCreateResult).workspace !== null;
+}
+
+function parseSSEMessage(raw: string): { event: string; data: any } | null {
+  const lines = raw.split('\n').map((line) => line.trimEnd());
+  const eventLine = lines.find((line) => line.startsWith('event: '));
+  const dataLines = lines.filter((line) => line.startsWith('data: ')).map((line) => line.slice(6));
+  if (!eventLine || dataLines.length === 0) return null;
+  const event = eventLine.slice(7).trim();
+  const dataText = dataLines.join('\n');
+  try {
+    return { event, data: JSON.parse(dataText) };
+  } catch {
+    return { event, data: { chunk: dataText } };
+  }
 }
 
 function normalizeWorkspaceDirectoryListing(listing: WorkspaceDirectoryListing): WorkspaceDirectoryListing {

@@ -187,6 +187,49 @@ func TestCreateRemoteCloneWorkspaceRejectsInvalidURL(t *testing.T) {
 	}
 }
 
+func TestDeleteRemovesManagedCloneWorkspacePath(t *testing.T) {
+	managedRoot := t.TempDir()
+	managedRepo := filepath.Join(managedRoot, "managed-clone")
+	if output, err := exec.Command("git", "init", "-b", "main", managedRepo).CombinedOutput(); err != nil {
+		t.Fatalf("git init managed repo: %v: %s", err, output)
+	}
+	if err := os.MkdirAll(filepath.Join(managedRepo, "plans"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("git", "-C", managedRepo, "add", ".").CombinedOutput(); err != nil {
+		t.Fatalf("git add managed repo: %v: %s", err, output)
+	}
+	commit := exec.Command("git", "-C", managedRepo, "commit", "--allow-empty", "-m", "init")
+	commit.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com")
+	if output, err := commit.CombinedOutput(); err != nil {
+		t.Fatalf("git commit managed repo: %v: %s", err, output)
+	}
+
+	root := t.TempDir()
+	git := gitadapter.New()
+	reg := registry.New(filepath.Join(root, "workspaces.yaml"), git)
+	workspace, err := reg.Create(models.WorkspaceInput{
+		Name:             "Managed",
+		Path:             managedRepo,
+		RegistrationMode: models.WorkspaceRegistrationModeRemoteClone,
+		RemoteURL:        "https://example.com/org/repo.git",
+		BaselineBranch:   "main",
+		Sources:          []string{"plans"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := itemindex.New(filepath.Join(root, "item-index.yaml"))
+	service := New(reg, idx, scanner.New(git), nil, git)
+
+	if err := service.Delete(workspace.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(managedRepo); !os.IsNotExist(err) {
+		t.Fatalf("expected managed clone path to be deleted, stat err: %v", err)
+	}
+}
+
 func TestResetSourceStructureRemovesSettingsAndRescans(t *testing.T) {
 	root := newWorkspaceGitRepo(t)
 	writeWorkspaceGitFile(t, root, "docs/workspace-settings.yaml", `version: 1

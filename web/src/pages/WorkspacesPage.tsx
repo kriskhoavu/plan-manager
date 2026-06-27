@@ -36,11 +36,13 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
   const [path, setPath] = useState('');
   const [remoteUrl, setRemoteUrl] = useState('');
   const [cloneRoot, setCloneRoot] = useState('');
-  const [baselineBranch, setBaselineBranch] = useState('main');
+  const [baselineBranch, setBaselineBranch] = useState('master');
   const [sources, setSources] = useState('');
   const [systemConfig, setSystemConfig] = useState<SystemConfigPaths | null>(null);
   const [dataDirDraft, setDataDirDraft] = useState('');
   const [notice, setNotice] = useState<WorkspaceNotice | null>(null);
+  const [registrationLog, setRegistrationLog] = useState('');
+  const [registrationLogOpen, setRegistrationLogOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pathDragging, setPathDragging] = useState(false);
   const [editingId, setEditingId] = useState('');
@@ -65,19 +67,35 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
     event.preventDefault();
     setBusy(true);
     setNotice(null);
+    setRegistrationLog('');
+    setRegistrationLogOpen(false);
     try {
-      await api.createWorkspace(buildWorkspaceInput({ name, registrationMode, path, remoteUrl, cloneRoot, baselineBranch, sources }));
+      const input = buildWorkspaceInput({ name, registrationMode, path, remoteUrl, cloneRoot, baselineBranch, sources });
+      const result = registrationMode === 'remote_clone'
+        ? await api.createWorkspaceStream(input, (chunk) => {
+          setRegistrationLog((current) => `${current}${chunk}`);
+          setRegistrationLogOpen(true);
+        })
+        : await api.createWorkspace(input);
       setNotice({ tone: 'success', title: 'Workspace registered', details: [name || 'New workspace'] });
+      if (result.operationLog.trim()) {
+        setRegistrationLog(result.operationLog);
+        setRegistrationLogOpen(true);
+      }
       setName('');
       setRegistrationMode('local_path');
       setPath('');
       setRemoteUrl('');
       setCloneRoot(systemConfig?.cloneRootDir ?? '');
-      setBaselineBranch('main');
+      setBaselineBranch('master');
       setSources('');
       onChanged();
     } catch (err) {
       setNotice({ tone: 'error', title: registrationMode === 'remote_clone' ? 'Remote workspace registration failed' : 'Local workspace registration failed', details: [errorMessage(err)] });
+      if (err instanceof Error && 'operationLog' in err && typeof (err as { operationLog?: string }).operationLog === 'string' && (err as { operationLog?: string }).operationLog?.trim()) {
+        setRegistrationLog((err as { operationLog?: string }).operationLog ?? '');
+        setRegistrationLogOpen(true);
+      }
     } finally {
       setBusy(false);
     }
@@ -448,10 +466,18 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
             </>
           )}
           <div className="repo-field-grid">
-            <label className="repo-field">Base Branch<input value={baselineBranch} onChange={(event) => setBaselineBranch(event.target.value)} /></label>
+            <BranchField value={baselineBranch} onChange={setBaselineBranch} />
             <SourcesField value={sources} onChange={setSources} />
           </div>
           <button className="primary repo-submit" disabled={busy}><FolderGit2 size={16} /> Register Workspace</button>
+          {registrationLog && (
+            <section className="registration-log-panel">
+              <button className="secondary" type="button" onClick={() => setRegistrationLogOpen((open) => !open)}>
+                {registrationLogOpen ? 'Hide logs' : 'Show logs'}
+              </button>
+              {registrationLogOpen && <pre>{registrationLog}</pre>}
+            </section>
+          )}
           </form>
         </div>
 
@@ -479,7 +505,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
                       <label className="repo-field">Workspace Name<input value={editDraft.name} onChange={(event) => setEditDraft({ ...editDraft, name: event.target.value })} /></label>
                       <label className="repo-field">Local Path<input value={editDraft.path} onChange={(event) => setEditDraft({ ...editDraft, path: event.target.value })} /></label>
                       <div className="repo-field-grid">
-                        <label className="repo-field">Base Branch<input value={editDraft.baselineBranch} onChange={(event) => setEditDraft({ ...editDraft, baselineBranch: event.target.value })} /></label>
+                        <BranchField value={editDraft.baselineBranch} onChange={(value) => setEditDraft({ ...editDraft, baselineBranch: value })} />
                         <SourcesField value={editDraft.sources} onChange={(value) => setEditDraft({ ...editDraft, sources: value })} />
                       </div>
                     </div>
@@ -527,7 +553,7 @@ export function WorkspacesPage({ workspaces, onChanged }: { workspaces: Workspac
       {repoToRemove && (
         <ConfirmDialog
           title="Remove workspace"
-          message={`Remove ${repoToRemove.name}? Cached items for this workspace will be removed from the board.`}
+          message={`Remove ${repoToRemove.name}? Cached items will be removed from the board${repoToRemove.clonePathManaged ? ', and the managed cloned repository folder will be deleted.' : '.'}`}
           confirmLabel={busy ? 'Removing...' : 'Remove'}
           busy={busy}
           danger
@@ -831,6 +857,27 @@ function SourcesField({ value, onChange }: { value: string; onChange: (value: st
           ))}
         </div>
         <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="Add source" />
+      </div>
+    </label>
+  );
+}
+
+function BranchField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const normalized = value.trim().toLowerCase();
+  return (
+    <label className="repo-field">Base Branch
+      <div className="directory-input">
+        <div className="directory-chips branch-chips">
+          <button type="button" className={normalized === 'master' ? undefined : 'add-directory-chip'} onClick={() => onChange('master')}>
+            {normalized === 'master' ? <X size={13} /> : <Plus size={13} />}
+            master
+          </button>
+          <button type="button" className={normalized === 'main' ? undefined : 'add-directory-chip'} onClick={() => onChange('main')}>
+            {normalized === 'main' ? <X size={13} /> : <Plus size={13} />}
+            main
+          </button>
+        </div>
+        <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="Base branch" />
       </div>
     </label>
   );

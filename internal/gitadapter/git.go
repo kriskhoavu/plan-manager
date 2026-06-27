@@ -3,7 +3,9 @@ package gitadapter
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -18,7 +20,8 @@ import (
 )
 
 type GitAdapter struct {
-	timeout time.Duration
+	timeout      time.Duration
+	cloneTimeout time.Duration
 }
 
 type TreeEntry struct {
@@ -32,7 +35,7 @@ type TreeEntry struct {
 }
 
 func New() *GitAdapter {
-	return &GitAdapter{timeout: 5 * time.Second}
+	return &GitAdapter{timeout: 5 * time.Second, cloneTimeout: 10 * time.Minute}
 }
 
 func (g *GitAdapter) WorkspaceRoot(path string) (string, error) {
@@ -271,6 +274,19 @@ func (g *GitAdapter) SwitchBranch(workspacePath, name string) error {
 }
 
 func (g *GitAdapter) Clone(remoteURL, destination string) error {
+	_, err := g.CloneWithLog(remoteURL, destination)
+	return err
+}
+
+func (g *GitAdapter) CloneWithLog(remoteURL, destination string) (string, error) {
+	var builder strings.Builder
+	err := g.CloneWithProgress(remoteURL, destination, func(chunk string) {
+		builder.WriteString(chunk)
+	})
+	return strings.TrimSpace(builder.String()), err
+}
+
+func (g *GitAdapter) CloneWithProgress(remoteURL, destination string, onChunk func(string)) error {
 	cleanRemote := strings.TrimSpace(remoteURL)
 	cleanDestination := strings.TrimSpace(destination)
 	if cleanRemote == "" {
@@ -283,8 +299,26 @@ func (g *GitAdapter) Clone(remoteURL, destination string) error {
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return err
 	}
-	_, err := g.runIn(parent, "clone", "--", cleanRemote, filepath.Base(cleanDestination))
-	return err
+	var stdout, stderr bytes.Buffer
+	stream := &chunkStreamWriter{onChunk: onChunk}
+	ctx, cancel := context.WithTimeout(context.Background(), g.cloneTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "clone", "--progress", "--", cleanRemote, filepath.Base(cleanDestination))
+	cmd.Dir = parent
+	cmd.Stdout = io.MultiWriter(&stdout, stream)
+	cmd.Stderr = io.MultiWriter(&stderr, stream)
+	err := cmd.Run()
+	if err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("git command timed out after %s", g.cloneTimeout)
+		}
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("%s", msg)
+	}
+	return nil
 }
 
 func (g *GitAdapter) run(dir string, args ...string) (string, error) {
@@ -292,7 +326,19 @@ func (g *GitAdapter) run(dir string, args ...string) (string, error) {
 }
 
 func (g *GitAdapter) runIn(dir string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), g.timeout)
+	return g.runWithTimeout(dir, g.timeout, args...)
+}
+
+func (g *GitAdapter) runWithTimeout(dir string, timeout time.Duration, args ...string) (string, error) {
+	stdout, _, err := g.runWithTimeoutDetailed(dir, timeout, args...)
+	if err != nil {
+		return "", err
+	}
+	return stdout, nil
+}
+
+func (g *GitAdapter) runWithTimeoutDetailed(dir string, timeout time.Duration, args ...string) (string, string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
@@ -300,13 +346,28 @@ func (g *GitAdapter) runIn(dir string, args ...string) (string, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return stdout.String(), stderr.String(), fmt.Errorf("git command timed out after %s", timeout)
+		}
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
 			msg = err.Error()
 		}
-		return "", fmt.Errorf("%s", msg)
+		return stdout.String(), stderr.String(), fmt.Errorf("%s", msg)
 	}
-	return stdout.String(), nil
+	return stdout.String(), stderr.String(), nil
+}
+
+type chunkStreamWriter struct {
+	onChunk func(string)
+}
+
+func (w *chunkStreamWriter) Write(p []byte) (int, error) {
+	if w.onChunk != nil && len(p) > 0 {
+		chunk := strings.ReplaceAll(string(p), "\r", "\n")
+		w.onChunk(chunk)
+	}
+	return len(p), nil
 }
 
 func cleanGitTreePath(relPath string) (string, error) {

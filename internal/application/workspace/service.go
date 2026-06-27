@@ -34,6 +34,11 @@ type SourceStructureSaveResult struct {
 	Scan models.ScanResult `json:"scan" yaml:"scan"`
 }
 
+type CreateResult struct {
+	Workspace    models.WorkspaceConfig `json:"workspace" yaml:"workspace"`
+	OperationLog string                 `json:"operationLog,omitempty" yaml:"operationLog,omitempty"`
+}
+
 type Service struct {
 	registry *registry.Registry
 	index    *itemindex.Index
@@ -99,16 +104,34 @@ func (s *Service) Get(id string) (models.WorkspaceConfig, bool, error) {
 }
 
 func (s *Service) Create(input models.WorkspaceInput) (models.WorkspaceConfig, error) {
+	result, err := s.CreateWithResult(input)
+	if err != nil {
+		return models.WorkspaceConfig{}, err
+	}
+	return result.Workspace, nil
+}
+
+func (s *Service) CreateWithResult(input models.WorkspaceInput) (CreateResult, error) {
+	return s.CreateWithResultStreaming(input, nil)
+}
+
+func (s *Service) CreateWithResultStreaming(input models.WorkspaceInput, onLog func(string)) (CreateResult, error) {
 	mode := normalizeRegistrationMode(input.RegistrationMode)
 	input.RegistrationMode = mode
+	operationLog := ""
 	if mode == models.WorkspaceRegistrationModeRemoteClone {
-		resolved, err := s.prepareRemoteClone(input)
+		resolved, cloneLog, err := s.prepareRemoteClone(input, onLog)
+		operationLog = cloneLog
 		if err != nil {
-			return models.WorkspaceConfig{}, err
+			return CreateResult{OperationLog: operationLog}, err
 		}
 		input = resolved
 	}
-	return s.registry.Create(input)
+	workspace, err := s.registry.Create(input)
+	if err != nil {
+		return CreateResult{OperationLog: operationLog}, err
+	}
+	return CreateResult{Workspace: workspace, OperationLog: operationLog}, nil
 }
 
 func (s *Service) Update(id string, input models.WorkspaceInput) (models.WorkspaceConfig, error) {
@@ -116,6 +139,18 @@ func (s *Service) Update(id string, input models.WorkspaceInput) (models.Workspa
 }
 
 func (s *Service) Delete(id string) error {
+	workspace, ok, err := s.registry.Get(id)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("workspace not found")
+	}
+	if workspace.ClonePathManaged {
+		if err := removeManagedCloneWorkspace(workspace.Path); err != nil {
+			return err
+		}
+	}
 	if err := s.registry.Delete(id); err != nil {
 		return err
 	}
@@ -407,33 +442,41 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func (s *Service) prepareRemoteClone(input models.WorkspaceInput) (models.WorkspaceInput, error) {
+func (s *Service) prepareRemoteClone(input models.WorkspaceInput, onLog func(string)) (models.WorkspaceInput, string, error) {
 	if s.git == nil {
 		s.git = gitadapter.New()
 	}
 	remoteURL := strings.TrimSpace(input.RemoteURL)
 	if !validRemoteURL(remoteURL) {
-		return models.WorkspaceInput{}, fmt.Errorf("remote URL must be a valid HTTPS or SSH Git URL")
+		return models.WorkspaceInput{}, "", fmt.Errorf("remote URL must be a valid HTTPS or SSH Git URL")
 	}
 	cloneRoot, err := resolveCloneRoot(input.CloneRoot)
 	if err != nil {
-		return models.WorkspaceInput{}, err
+		return models.WorkspaceInput{}, "", err
 	}
 	repoName := remoteRepositoryName(remoteURL)
 	if repoName == "" {
-		return models.WorkspaceInput{}, fmt.Errorf("remote URL must include a repository name")
+		return models.WorkspaceInput{}, "", fmt.Errorf("remote URL must include a repository name")
 	}
 	destination := filepath.Join(cloneRoot, repoName)
 	if err := ensureCloneDestination(destination); err != nil {
-		return models.WorkspaceInput{}, err
+		return models.WorkspaceInput{}, "", err
 	}
-	if err := s.git.Clone(remoteURL, destination); err != nil {
-		return models.WorkspaceInput{}, fmt.Errorf("clone failed: %w", err)
+	var cloneLogBuilder strings.Builder
+	err = s.git.CloneWithProgress(remoteURL, destination, func(chunk string) {
+		cloneLogBuilder.WriteString(chunk)
+		if onLog != nil {
+			onLog(chunk)
+		}
+	})
+	cloneLog := strings.TrimSpace(cloneLogBuilder.String())
+	if err != nil {
+		return models.WorkspaceInput{}, cloneLog, fmt.Errorf("clone failed: %w", err)
 	}
 	input.Path = destination
 	input.RemoteURL = remoteURL
 	input.CloneRoot = cloneRoot
-	return input, nil
+	return input, cloneLog, nil
 }
 
 func resolveCloneRoot(root string) (string, error) {
@@ -538,4 +581,21 @@ func expandHome(path string) string {
 		}
 	}
 	return path
+}
+
+func removeManagedCloneWorkspace(path string) error {
+	clean := strings.TrimSpace(path)
+	if clean == "" {
+		return fmt.Errorf("managed clone path is invalid")
+	}
+	clean = filepath.Clean(clean)
+	if clean == "." || clean == string(filepath.Separator) {
+		return fmt.Errorf("managed clone path is invalid")
+	}
+	if _, err := os.Stat(clean); os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	return os.RemoveAll(clean)
 }
