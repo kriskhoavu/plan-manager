@@ -1372,6 +1372,7 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
   const [selectedGitPaths, setSelectedGitPaths] = useState<string[]>([]);
   const [branchName, setBranchName] = useState('');
   const [gitBusy, setGitBusy] = useState('');
+  const [gitActivityOpen, setGitActivityOpen] = useState(() => readStoredToggle('kanban.drawer.gitActivityOpen'));
   const [error, setError] = useState('');
   const [width, setWidth] = useState(1120);
   const autoSaveTimerRef = useRef<number | null>(null);
@@ -1797,10 +1798,6 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                     <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
                   </div>
                   {(plan?.tags?.length ?? 0) > 0 && <div className="tags">{plan?.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}
-                  <section className="drawer-recent-activity">
-                    <h4>Recent Activity</h4>
-                    <RecentGitActivity entries={gitActivity} loading={gitActivityLoading} emptyLabel="No activity found for this item." pathLabel={activityPath || 'workspace'} />
-                  </section>
                 </>
               )}
               {sideTab === 'git' && (
@@ -1836,6 +1833,17 @@ function PlanPreviewDrawer({ itemId, refreshKey, onClose, onOpenFull, onChanged 
                       {gitBusy === 'branch' ? 'Creating...' : 'Create Branch'}
                     </button>
                   </div>
+                  <details className="recent-activity-panel" open={gitActivityOpen} onToggle={(event) => {
+                    const open = event.currentTarget.open;
+                    setGitActivityOpen(open);
+                    localStorage.setItem('kanban.drawer.gitActivityOpen', open ? '1' : '0');
+                  }}>
+                    <summary>
+                      <span>Recent Activity</span>
+                      <small>{gitActivity.length} events</small>
+                    </summary>
+                    <RecentGitActivity entries={gitActivity} loading={gitActivityLoading} emptyLabel="No activity found for this item." pathLabel={activityPath || 'workspace'} />
+                  </details>
                 </section>
                 ) : (
                   <div className="metadata-callout">
@@ -1938,4 +1946,8 @@ function orderBranchOptions(values: string[]): string[] {
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
+}
+
+function readStoredToggle(key: string): boolean {
+  return localStorage.getItem(key) === '1';
 }

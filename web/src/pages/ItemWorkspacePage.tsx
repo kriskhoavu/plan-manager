@@ -53,6 +53,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const [selectedGitPaths, setSelectedGitPaths] = useState<string[]>([]);
   const [branchName, setBranchName] = useState('');
   const [gitBusy, setGitBusy] = useState('');
+  const [gitActivityOpen, setGitActivityOpen] = useState(() => readStoredToggle('item.details.gitActivityOpen'));
   const [diff, setDiff] = useState('');
   const [diffMode, setDiffMode] = useState<DiffMode>('review');
   const [revertingFile, setRevertingFile] = useState(false);
@@ -518,10 +519,6 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
                 <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || plan?.metadataSource === 'docs'} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
               </div>
               <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
-              <section className="drawer-recent-activity">
-                <h4>Recent Activity</h4>
-                <RecentGitActivity entries={gitActivity} loading={gitActivityLoading} emptyLabel="No activity found for this item." pathLabel={activityPath || 'workspace'} />
-              </section>
               {plan?.warnings?.length ? (
                 <div className="plan-warnings">
                   <h3>Warnings</h3>
@@ -564,6 +561,17 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
                       {gitBusy === 'branch' ? 'Creating...' : 'Create Branch'}
                     </button>
                   </div>
+                  <details className="recent-activity-panel" open={gitActivityOpen} onToggle={(event) => {
+                    const open = event.currentTarget.open;
+                    setGitActivityOpen(open);
+                    localStorage.setItem('item.details.gitActivityOpen', open ? '1' : '0');
+                  }}>
+                    <summary>
+                      <span>Recent Activity</span>
+                      <small>{gitActivity.length} events</small>
+                    </summary>
+                    <RecentGitActivity entries={gitActivity} loading={gitActivityLoading} emptyLabel="No activity found for this item." pathLabel={activityPath || 'workspace'} />
+                  </details>
                 </section>
                 ) : (
                   <div className="metadata-callout">
@@ -788,4 +796,8 @@ function stripItemPath(path: string, itemPath: string): string {
 
 function normalizePath(path: string): string {
   return path.replace(/^\/+/, '').replace(/\/+$/, '');
+}
+
+function readStoredToggle(key: string): boolean {
+	return localStorage.getItem(key) === '1';
 }

@@ -378,6 +378,7 @@ function ExplorerInspector({ workspace, row, file, onOpenKanban }: { workspace?:
   const [git, setGit] = useState<GitStatus | null>(null);
   const [activity, setActivity] = useState<GitActivityEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(() => readStoredToggle('explorer.inspector.gitActivityOpen'));
   const [health, setHealth] = useState<WorkspaceHealth | null>(null);
   const [item, setItem] = useState<ItemSummary | null>(null);
   const activityPath = row?.node.type === 'file' || row?.node.type === 'directory'
@@ -420,11 +421,27 @@ function ExplorerInspector({ workspace, row, file, onOpenKanban }: { workspace?:
     <section><h3>Workspace</h3><dl><dt>Name</dt><dd>{workspace.name}</dd><dt>Branch</dt><dd>{git?.branch ?? workspace.baselineBranch}</dd><dt>Health</dt><dd>{health?.summary ?? 'Loading'}</dd><dt>Changes</dt><dd>{git?.changes.length ?? 0}</dd></dl><button className="secondary" onClick={() => onOpenKanban(workspace, row?.item?.itemId)}><KanbanSquare size={15} /> Open Kanban</button></section>
     {file && <section><h3>File</h3><dl><dt>Path</dt><dd>{file.path}</dd><dt>Kind</dt><dd>{file.kind}</dd><dt>Size</dt><dd>{file.sizeBytes.toLocaleString()} bytes</dd><dt>Editable</dt><dd>{file.editable ? 'Text' : 'Read only'}</dd></dl></section>}
     {row?.item && <section><h3>Item</h3><dl><dt>ID</dt><dd>{row.item.identifier}</dd><dt>Title</dt><dd>{row.item.title}</dd><dt>Status</dt><dd>{row.item.status}</dd><dt>Owner</dt><dd>{item?.owner || 'Unassigned'}</dd></dl><a className="secondary button-link" href={`/items/${encodeURIComponent(row.item.itemId)}`}>Open details</a></section>}
-    <section><h3>Recent Activity</h3><RecentGitActivity entries={activity} loading={activityLoading} emptyLabel="No activity found for this selection." pathLabel={activityPath || 'workspace'} /></section>
+    <section>
+      <details className="recent-activity-panel" open={activityOpen} onToggle={(event) => {
+        const open = event.currentTarget.open;
+        setActivityOpen(open);
+        localStorage.setItem('explorer.inspector.gitActivityOpen', open ? '1' : '0');
+      }}>
+        <summary>
+          <span>Recent Activity</span>
+          <small>{activity.length} events</small>
+        </summary>
+        <RecentGitActivity entries={activity} loading={activityLoading} emptyLabel="No activity found for this selection." pathLabel={activityPath || 'workspace'} />
+      </details>
+    </section>
   </div>;
 }
 
 function boundedNumber(value: string | null, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.min(520, Math.max(220, parsed)) : fallback;
+}
+
+function readStoredToggle(key: string): boolean {
+  return localStorage.getItem(key) === '1';
 }
