@@ -1,0 +1,167 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Frontend typecheck and test
+        run: npm run typecheck && npm test -- --run
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Backend test
+        run: go test ./...
+
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+            ext: tar.gz
+          - goos: darwin
+            goarch: amd64
+            ext: tar.gz
+          - goos: linux
+            goarch: amd64
+            ext: tar.gz
+          - goos: windows
+            goarch: amd64
+            ext: zip
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Build binary
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p dist
+          BIN_NAME="plan-manager"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            BIN_NAME="plan-manager.exe"
+          fi
+          go build -trimpath -ldflags "-s -w" -o "dist/${BIN_NAME}" ./cmd/plan-manager
+
+      - name: Package artifact
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARTIFACT_BASE="plan-manager_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          mkdir -p package
+          cp README.md package/
+          cp LICENSE* package/ 2>/dev/null || true
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            cp dist/plan-manager.exe package/
+            (cd package && zip -r "../${ARTIFACT_BASE}.zip" .)
+          else
+            cp dist/plan-manager package/
+            tar -C package -czf "${ARTIFACT_BASE}.tar.gz" .
+          fi
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            plan-manager_*_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz
+            plan-manager_*_${{ matrix.goos }}_${{ matrix.goarch }}.zip
+
+  checksums:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Flatten release assets
+        run: |
+          mkdir -p out
+          find release-assets -type f -name "plan-manager_*" -exec cp {} out/ \;
+
+      - name: Generate SHA256SUMS
+        run: |
+          cd out
+          sha256sum plan-manager_* > SHA256SUMS
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-checksums
+          path: out/SHA256SUMS
+
+  publish:
+    needs: checksums
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Collect release files
+        run: |
+          mkdir -p release
+          find release-assets -type f -name "plan-manager_*" -exec cp {} release/ \;
+          find release-assets -type f -name "SHA256SUMS" -exec cp {} release/ \;
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release/plan-manager_*.tar.gz
+            release/plan-manager_*.zip
+            release/SHA256SUMS
