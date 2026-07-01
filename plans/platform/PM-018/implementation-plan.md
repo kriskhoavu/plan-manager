@@ -11,7 +11,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 | B1    | Capability And Settings Foundation | Done   |
 | B2    | Context And Launch Service         | Done   |
 | F1    | AI Settings                        | Done   |
-| F2    | Item Launch Workflow               | Draft  |
+| F2    | Item Launch Workflow               | Done   |
 | V1    | Integrated Verification            | Draft  |
 
 ## Phase B1: Capability And Settings Foundation
@@ -57,10 +57,10 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 
 **Deliverables:**
 
-- [ ] Add item action and accessible launch dialog.
-- [ ] Add provider, terminal, and intent selection.
-- [ ] Display implementation eligibility and recovery guidance.
-- [ ] Add successful, blocked, missing-tool, and duplicate-submit tests.
+- [x] Add item action and accessible launch dialog.
+- [x] Add provider, terminal, and intent selection.
+- [x] Display implementation eligibility and recovery guidance.
+- [x] Add successful, blocked, missing-tool, and duplicate-submit tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/ItemWorkspacePage.test.ts web/src/features/ai-session`
 

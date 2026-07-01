@@ -121,6 +121,23 @@ export interface AISettings {
   terminals: Record<string, AILaunchTemplate>;
 }
 
+export interface AISessionEligibility {
+  editable: boolean;
+  implementationReady: boolean;
+  missing: string[];
+}
+
+export interface AISessionLaunchInput {
+  provider: string;
+  terminal: string;
+  intent: 'brainstorm' | 'implement';
+}
+
+export interface AISessionLaunchResult extends AISessionLaunchInput {
+  accepted: boolean;
+  startedAt: string;
+}
+
 export interface SourceStructureSettings {
   version: number;
   cards: SourceStructureCard[];
