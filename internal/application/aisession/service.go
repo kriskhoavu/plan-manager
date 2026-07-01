@@ -26,6 +26,7 @@ type Service struct {
 	lookPath func(string) (string, error)
 	stat     func(string) (os.FileInfo, error)
 	goos     string
+	launch   *launchDependencies
 }
 
 func New(store *aisettings.Store) *Service {

@@ -24,12 +24,13 @@ Built-in provider presets start an interactive session with an initial prompt in
 
 ## API Contract
 
-| Method | Endpoint                      | Request                | Response                     |
-|--------|-------------------------------|------------------------|------------------------------|
-| GET    | `/api/ai/capabilities`        | None                   | Capability list              |
-| GET    | `/api/ai/settings`            | None                   | Effective AI settings        |
-| PUT    | `/api/ai/settings`            | `AISettings`           | Validated effective settings |
-| POST   | `/api/items/{id}/ai-sessions` | `AISessionLaunchInput` | `AISessionLaunchResult`      |
+| Method | Endpoint                                 | Request                | Response                     |
+|--------|------------------------------------------|------------------------|------------------------------|
+| GET    | `/api/ai/capabilities`                   | None                   | Capability list              |
+| GET    | `/api/ai/settings`                       | None                   | Effective AI settings        |
+| PUT    | `/api/ai/settings`                       | `AISettings`           | Validated effective settings |
+| GET    | `/api/items/{id}/ai-session-eligibility` | None                   | Item launch eligibility      |
+| POST   | `/api/items/{id}/ai-sessions`            | `AISessionLaunchInput` | `AISessionLaunchResult`      |
 
 ## Validation and Failure Modes
 
@@ -44,7 +45,7 @@ Built-in provider presets start an interactive session with an initial prompt in
 ## Terminal Adapters
 
 - macOS Terminal: open a generated mode-0700 wrapper that changes to the validated workspace and executes the argument array.
-- iTerm2: use AppleScript with escaped wrapper path only.
+- iTerm2: use macOS `open -a` with the validated app and wrapper paths.
 - WezTerm: invoke `wezterm start --cwd <workspace> -- <provider args>` as an argument array.
 - Wrapper files contain only pre-quoted validated arguments and remove themselves after process start.
 

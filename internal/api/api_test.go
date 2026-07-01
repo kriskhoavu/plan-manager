@@ -96,6 +96,23 @@ func TestAIRoutesAreUnavailableWithoutService(t *testing.T) {
 	}
 }
 
+func TestAILaunchRouteValidatesBodyAndReportsUnavailableLauncher(t *testing.T) {
+	service := appaisession.New(aisettings.New(filepath.Join(t.TempDir(), "ai-settings.yaml")))
+	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
+
+	invalid := httptest.NewRecorder()
+	handler.ServeHTTP(invalid, httptest.NewRequest(http.MethodPost, "/api/items/item-1/ai-sessions", strings.NewReader(`{"intent":`)))
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid status = %d, body = %s", invalid.Code, invalid.Body.String())
+	}
+
+	unavailable := httptest.NewRecorder()
+	handler.ServeHTTP(unavailable, httptest.NewRequest(http.MethodPost, "/api/items/item-1/ai-sessions", strings.NewReader(`{"provider":"codex","terminal":"terminal","intent":"brainstorm"}`)))
+	if unavailable.Code != http.StatusInternalServerError || !strings.Contains(unavailable.Body.String(), `"code":"launch_failed"`) {
+		t.Fatalf("unavailable status = %d, body = %s", unavailable.Code, unavailable.Body.String())
+	}
+}
+
 func TestFallbackItemPath(t *testing.T) {
 	workspace := models.WorkspaceConfig{Sources: []string{"items"}}
 	item := models.ItemDetail{ItemSummary: models.ItemSummary{Scope: "api", Identifier: "DI-170"}}

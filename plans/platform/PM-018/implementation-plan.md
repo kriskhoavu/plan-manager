@@ -9,7 +9,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 | Phase | Name                               | Status |
 |-------|------------------------------------|--------|
 | B1    | Capability And Settings Foundation | Done   |
-| B2    | Context And Launch Service         | Draft  |
+| B2    | Context And Launch Service         | Done   |
 | F1    | AI Settings                        | Draft  |
 | F2    | Item Launch Workflow               | Draft  |
 | V1    | Integrated Verification            | Draft  |
@@ -31,10 +31,10 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 
 **Deliverables:**
 
-- [ ] Add item eligibility and workspace containment validation.
-- [ ] Generate private context manifests and 24-hour cleanup.
-- [ ] Add provider commands, Terminal/iTerm2/WezTerm adapters, and injected process runner.
-- [ ] Add launch endpoint, stable errors, audit events, and adapter tests.
+- [x] Add item eligibility and workspace containment validation.
+- [x] Generate private context manifests and 24-hour cleanup.
+- [x] Add provider commands, Terminal/iTerm2/WezTerm adapters, and injected process runner.
+- [x] Add launch endpoint, stable errors, audit events, and adapter tests.
 
 **Verification:** `go test ./internal/application/aisession ./internal/ailaunch ./internal/api`
 
