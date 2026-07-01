@@ -16,6 +16,7 @@ type Paths struct {
 	AuditLogFile     string
 	SavedFiltersFile string
 	RecentItemsFile  string
+	AISettingsFile   string
 	CloneRootDir     string
 	FrontendAssets   string
 }
@@ -44,6 +45,7 @@ func ResolvePaths() (Paths, error) {
 		AuditLogFile:     filepath.Join(dir, "audit-log.jsonl"),
 		SavedFiltersFile: filepath.Join(dir, "saved-filters.yaml"),
 		RecentItemsFile:  filepath.Join(dir, "recent-items.yaml"),
+		AISettingsFile:   filepath.Join(dir, "ai-settings.yaml"),
 		CloneRootDir:     cloneRootDir,
 	}
 	copyLegacyFile(filepath.Join(dir, "repositories.yaml"), paths.RegistryFile)

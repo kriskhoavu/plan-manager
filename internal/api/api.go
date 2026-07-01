@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"plan-manager/internal/aisettings"
+	appaisession "plan-manager/internal/application/aisession"
 	"plan-manager/internal/application/apperrors"
 	appcontentsearch "plan-manager/internal/application/contentsearch"
 	appgit "plan-manager/internal/application/git"
@@ -45,6 +47,12 @@ type API struct {
 	navigation     *navigation.Store
 	workspaceFiles *appworkspacefiles.Service
 	contentSearch  *appcontentsearch.Service
+	aiSessions     *appaisession.Service
+}
+
+func (a *API) WithAISessions(service *appaisession.Service) *API {
+	a.aiSessions = service
+	return a
 }
 
 func New(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *gitadapter.GitAdapter, dialog *systemdialog.Dialog) *API {
@@ -86,6 +94,9 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/saved-filters/{id}", a.deleteFilter)
 	mux.HandleFunc("GET /api/recent-items", a.recentItems)
 	mux.HandleFunc("POST /api/recent-items", a.recordRecentItem)
+	mux.HandleFunc("GET /api/ai/capabilities", a.aiCapabilities)
+	mux.HandleFunc("GET /api/ai/settings", a.aiSettings)
+	mux.HandleFunc("PUT /api/ai/settings", a.saveAISettings)
 	mux.HandleFunc("GET /api/workspaces", a.listWorkspaces)
 	mux.HandleFunc("POST /api/workspaces", a.createWorkspace)
 	mux.HandleFunc("POST /api/workspaces/stream-create", a.createWorkspaceStream)
@@ -133,6 +144,40 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/system/config-paths", a.systemConfigPaths)
 	mux.HandleFunc("PUT /api/system/config-paths", a.updateSystemConfigPaths)
 	return mux
+}
+
+func (a *API) aiCapabilities(w http.ResponseWriter, _ *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session settings are unavailable")
+		return
+	}
+	capabilities, err := a.aiSessions.Capabilities()
+	respond(w, capabilities, err)
+}
+
+func (a *API) aiSettings(w http.ResponseWriter, _ *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session settings are unavailable")
+		return
+	}
+	settings, err := a.aiSessions.Settings()
+	respond(w, settings, err)
+}
+
+func (a *API) saveAISettings(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session settings are unavailable")
+		return
+	}
+	var settings aisettings.Settings
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&settings); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	saved, err := a.aiSessions.Save(settings)
+	respond(w, saved, err)
 }
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {

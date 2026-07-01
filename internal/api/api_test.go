@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"plan-manager/internal/aisettings"
+	appaisession "plan-manager/internal/application/aisession"
 	apphealth "plan-manager/internal/application/health"
 	appsearch "plan-manager/internal/application/search"
 	"plan-manager/internal/audit"
@@ -21,6 +23,78 @@ import (
 	"plan-manager/internal/navigation"
 	"plan-manager/internal/registry"
 )
+
+func TestAISettingsRoutesReadValidateAndPersist(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ai-settings.yaml")
+	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(appaisession.New(aisettings.New(path))).Routes()
+
+	get := httptest.NewRecorder()
+	handler.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/api/ai/settings", nil))
+	if get.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, body = %s", get.Code, get.Body.String())
+	}
+	var defaults aisettings.Settings
+	if err := json.Unmarshal(get.Body.Bytes(), &defaults); err != nil {
+		t.Fatal(err)
+	}
+	if len(defaults.Providers) != 4 || defaults.DefaultProvider == "" {
+		t.Fatalf("defaults = %#v", defaults)
+	}
+
+	defaults.DefaultProvider = "claude"
+	body, err := json.Marshal(defaults)
+	if err != nil {
+		t.Fatal(err)
+	}
+	put := httptest.NewRecorder()
+	handler.ServeHTTP(put, httptest.NewRequest(http.MethodPut, "/api/ai/settings", strings.NewReader(string(body))))
+	if put.Code != http.StatusOK {
+		t.Fatalf("PUT status = %d, body = %s", put.Code, put.Body.String())
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(data), "defaultProvider: claude") {
+		t.Fatalf("saved data = %q, err = %v", data, err)
+	}
+
+	invalid := httptest.NewRecorder()
+	handler.ServeHTTP(invalid, httptest.NewRequest(http.MethodPut, "/api/ai/settings", strings.NewReader(`{"defaultProvider":"missing"}`)))
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid status = %d, body = %s", invalid.Code, invalid.Body.String())
+	}
+}
+
+func TestAICapabilitiesRouteReturnsStableShape(t *testing.T) {
+	service := appaisession.New(aisettings.New(filepath.Join(t.TempDir(), "ai-settings.yaml")))
+	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/ai/capabilities", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	var capabilities []appaisession.Capability
+	if err := json.Unmarshal(response.Body.Bytes(), &capabilities); err != nil {
+		t.Fatal(err)
+	}
+	if len(capabilities) < 4 {
+		t.Fatalf("capabilities = %#v", capabilities)
+	}
+	for _, capability := range capabilities {
+		if capability.ID == "" || capability.Kind == "" || capability.Executable == "" {
+			t.Fatalf("invalid capability = %#v", capability)
+		}
+	}
+}
+
+func TestAIRoutesAreUnavailableWithoutService(t *testing.T) {
+	handler := New(nil, nil, nil, nil, nil, nil, nil).Routes()
+	for _, endpoint := range []string{"/api/ai/settings", "/api/ai/capabilities"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, endpoint, nil))
+		if response.Code != http.StatusServiceUnavailable {
+			t.Fatalf("%s status = %d", endpoint, response.Code)
+		}
+	}
+}
 
 func TestFallbackItemPath(t *testing.T) {
 	workspace := models.WorkspaceConfig{Sources: []string{"items"}}

@@ -10,7 +10,9 @@ import (
 	"strconv"
 	"strings"
 
+	"plan-manager/internal/aisettings"
 	"plan-manager/internal/api"
+	"plan-manager/internal/application/aisession"
 	"plan-manager/internal/application/health"
 	appsearch "plan-manager/internal/application/search"
 	"plan-manager/internal/audit"
@@ -51,7 +53,8 @@ func NewServer(port int) (*Server, error) {
 	healthService := health.New(reg, idx, git)
 	searchService := appsearch.New(idx)
 	navigationStore := navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile)
-	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService, searchService, navigationStore)
+	aiSessionService := aisession.New(aisettings.New(paths.AISettingsFile))
+	apiHandler := api.NewWithServices(reg, idx, scan, files, writer, git, systemdialog.New(), auditStore, healthService, searchService, navigationStore).WithAISessions(aiSessionService)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler.Routes())

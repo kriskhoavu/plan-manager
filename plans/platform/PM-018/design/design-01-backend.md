@@ -1,0 +1,58 @@
+# Backend Design: External AI Session Launch
+
+## Overview
+
+Add an `aisession` application service, app-owned settings store, provider adapters, and macOS terminal adapters. Process execution is abstracted for testing. The service resolves items through the index and workspaces through the registry before generating any manifest or command.
+
+## Data Model
+
+| Type                    | Key Fields                                                     |
+|-------------------------|----------------------------------------------------------------|
+| `AICapability`          | `id`, `kind`, `detected`, `executable`, `version`, `reason`    |
+| `AISettings`            | `defaultProvider`, `defaultTerminal`, `providers`, `terminals` |
+| `LaunchTemplate`        | `executable`, `args`, `enabled`                                |
+| `AISessionLaunchInput`  | `provider`, `terminal`, `intent`                               |
+| `AISessionLaunchResult` | `accepted`, `provider`, `terminal`, `intent`, `startedAt`      |
+
+Settings are stored in `<data-dir>/ai-settings.yaml`. Context manifests are stored under `<data-dir>/ai-context/` and never under a registered workspace.
+
+## Template Contract
+
+Allowed placeholders are `{workspace}`, `{contextFile}`, `{itemPath}`, `{identifier}`, and `{intent}`. Each argument is expanded independently. Templates cannot specify environment overrides, redirections, pipes, command substitution, or additional working directories.
+
+Built-in provider presets start an interactive session with an initial prompt instructing the provider to read `{contextFile}`. Built-ins never add flags that bypass provider approvals or sandboxing.
+
+## API Contract
+
+| Method | Endpoint                      | Request                | Response                     |
+|--------|-------------------------------|------------------------|------------------------------|
+| GET    | `/api/ai/capabilities`        | None                   | Capability list              |
+| GET    | `/api/ai/settings`            | None                   | Effective AI settings        |
+| PUT    | `/api/ai/settings`            | `AISettings`           | Validated effective settings |
+| POST   | `/api/items/{id}/ai-sessions` | `AISessionLaunchInput` | `AISessionLaunchResult`      |
+
+## Validation and Failure Modes
+
+- Resolve the item and require `sourceMode=working_tree` and `editable=true`.
+- Resolve the canonical workspace root and require the item path to remain beneath it.
+- For implementation intent, parse `plan.yaml` and require `implementation-plan.md` within the item root.
+- Resolve executables without invoking a shell and reject non-executable paths.
+- Write manifests atomically with mode `0600`; remove expired files at startup and before launch.
+- Return stable error codes: `ai_provider_missing`, `terminal_missing`, `invalid_launch_template`, `item_not_editable`, `item_not_implementation_ready`, and `launch_failed`.
+- Audit success, blocked, and failed launches without arguments or manifest content.
+
+## Terminal Adapters
+
+- macOS Terminal: open a generated mode-0700 wrapper that changes to the validated workspace and executes the argument array.
+- iTerm2: use AppleScript with escaped wrapper path only.
+- WezTerm: invoke `wezterm start --cwd <workspace> -- <provider args>` as an argument array.
+- Wrapper files contain only pre-quoted validated arguments and remove themselves after process start.
+
+## Design Decisions
+
+| Decision                                | Rationale                                                    |
+|-----------------------------------------|--------------------------------------------------------------|
+| Separate capability and launch services | Detection must remain read-only and independently testable   |
+| Inject process runner                   | Tests must not open real terminal applications               |
+| Return acceptance, not PID              | External terminal owns the interactive child lifecycle       |
+| Do not inherit custom environment       | Prevent settings from becoming a secret or execution channel |
