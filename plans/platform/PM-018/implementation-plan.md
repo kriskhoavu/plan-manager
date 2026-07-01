@@ -12,7 +12,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 | B2    | Context And Launch Service         | Done   |
 | F1    | AI Settings                        | Done   |
 | F2    | Item Launch Workflow               | Done   |
-| V1    | Integrated Verification            | Draft  |
+| V1    | Integrated Verification            | Done   |
 
 ## Phase B1: Capability And Settings Foundation
 
@@ -70,10 +70,10 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 
 **Deliverables:**
 
-- [ ] Verify built-in adapters with fake executables and process runners.
-- [ ] Verify no manifest or wrapper is written inside a workspace.
-- [ ] Update architecture, requirements baseline, and user documentation.
-- [ ] Run full backend, frontend, and production build checks.
+- [x] Verify built-in adapters with fake executables and process runners.
+- [x] Verify no manifest or wrapper is written inside a workspace.
+- [x] Update architecture, requirements baseline, and user documentation.
+- [x] Run full backend, frontend, and production build checks.
 
 **Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/plan-manager`
 
