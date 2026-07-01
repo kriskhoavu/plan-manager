@@ -10,7 +10,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 |-------|------------------------------------|--------|
 | B1    | Capability And Settings Foundation | Done   |
 | B2    | Context And Launch Service         | Done   |
-| F1    | AI Settings                        | Draft  |
+| F1    | AI Settings                        | Done   |
 | F2    | Item Launch Workflow               | Draft  |
 | V1    | Integrated Verification            | Draft  |
 
@@ -44,10 +44,10 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 
 **Deliverables:**
 
-- [ ] Add shared API types and methods.
-- [ ] Add capability/settings hook and Settings page section.
-- [ ] Support detected recommendations, explicit defaults, overrides, validation, and refresh.
-- [ ] Add interaction and error-state tests.
+- [x] Add shared API types and methods.
+- [x] Add capability/settings hook and Settings page section.
+- [x] Support detected recommendations, explicit defaults, overrides, validation, and refresh.
+- [x] Add interaction and error-state tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/features/ai-settings`
 

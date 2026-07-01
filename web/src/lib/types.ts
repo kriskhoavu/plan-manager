@@ -97,6 +97,30 @@ export interface SystemConfigPaths {
   restartRequired?: boolean;
 }
 
+export type AICapabilityKind = 'provider' | 'terminal';
+
+export interface AICapability {
+  id: string;
+  kind: AICapabilityKind;
+  detected: boolean;
+  configured: boolean;
+  executable: string;
+  reason?: string;
+}
+
+export interface AILaunchTemplate {
+  enabled: boolean;
+  executable: string;
+  args: string[];
+}
+
+export interface AISettings {
+  defaultProvider: string;
+  defaultTerminal: string;
+  providers: Record<string, AILaunchTemplate>;
+  terminals: Record<string, AILaunchTemplate>;
+}
+
 export interface SourceStructureSettings {
   version: number;
   cards: SourceStructureCard[];

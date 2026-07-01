@@ -1,4 +1,6 @@
 import type {
+  AICapability,
+  AISettings,
   AppState,
   AuditEvent,
   BranchLoadResult,
@@ -75,6 +77,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  aiCapabilities: () => request<AICapability[]>('/api/ai/capabilities'),
+  aiSettings: () => request<AISettings>('/api/ai/settings'),
+  saveAISettings: (settings: AISettings) => request<AISettings>('/api/ai/settings', { method: 'PUT', body: JSON.stringify(settings) }),
   state: () => request<AppState>('/api/state'),
   search: async (params: { q: string; workspaceId?: string; types?: string[]; limit?: number }) => {
     const query = new URLSearchParams({ q: params.q });
