@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExplorerLocation } from '../../app/router';
 import { api } from '../../lib/api';
 import type { ExplorerTreeMode, WorkspaceConfig } from '../../lib/types';
@@ -20,6 +20,7 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
   const [filter, setFilter] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const [gitStateByPath, setGitStateByPath] = useState<Map<string, WorkspacePathGitState>>(new Map());
+  const lastAutoExpandedLocation = useRef('');
 
   const loadDecorations = useCallback(async () => {
     try {
@@ -159,7 +160,13 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
   }, [expandedNodeIds, loadDirectory, showIgnored, workspaces]);
 
   useEffect(() => {
-    if (!location?.workspaceId) return;
+    if (!location?.workspaceId) {
+      lastAutoExpandedLocation.current = '';
+      return;
+    }
+    const locationKey = JSON.stringify([location.workspaceId, location.path ?? '', mode, showIgnored]);
+    if (lastAutoExpandedLocation.current === locationKey) return;
+    lastAutoExpandedLocation.current = locationKey;
     const segments = (location.path ?? '').split('/').filter(Boolean);
     const directoryPaths = ['', ...segments.slice(0, -1).map((_, index) => segments.slice(0, index + 1).join('/'))];
     setExpandedNodeIds((current) => {
@@ -170,7 +177,7 @@ export function useWorkspaceExplorer(workspaces: WorkspaceConfig[], location?: E
       return next;
     });
     directoryPaths.forEach((path) => void loadDirectory(location.workspaceId!, path));
-  }, [loadDirectory, location?.path, location?.workspaceId]);
+  }, [loadDirectory, location?.path, location?.workspaceId, mode, showIgnored]);
 
 	const rows = useMemo(() => flattenVisibleTree({ workspaces, expandedNodeIds, cache, includeIgnored: showIgnored, decorations, filter, mode }), [cache, decorations, expandedNodeIds, filter, mode, showIgnored, workspaces]);
 
