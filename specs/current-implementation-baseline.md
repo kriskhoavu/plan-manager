@@ -609,7 +609,7 @@ Item AI APIs:
 - `GET /api/items/{id}/ai-session-eligibility`
 - `POST /api/items/{id}/ai-sessions`
 
-Sessions require an editable working-tree item. Implementation intent additionally requires valid `plan.yaml` and `implementation-plan.md`. Context manifests must use mode `0600`, remain under the app data directory, contain paths rather than copied repository contents, and expire after 24 hours.
+Launch intent may be `free_prompt`, `brainstorm`, or `implement`. Free prompt opens at the registered workspace root without provider prompt arguments or a context manifest and may be used from snapshot items. Context-based sessions require an editable working-tree item. Implementation intent additionally requires valid `plan.yaml` and `implementation-plan.md`. Context manifests must use mode `0600`, remain under the app data directory, contain paths rather than copied repository contents, and expire after 24 hours.
 
 Provider authentication, approvals, and sandbox behavior remain owned by the provider CLI. Audit events must not record prompts, command arguments, or manifest contents.
 

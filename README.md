@@ -36,7 +36,7 @@ Plan Manager addresses that gap by providing:
 - Use guarded Git flows for commit, fetch, pull, push, branch create/switch
 - Inspect workspace health and recent operation history
 - Detect local Claude, Codex, Copilot, and OpenCode CLIs
-- Launch a selected item in Terminal, iTerm2, or WezTerm with generated context
+- Launch Terminal, iTerm2, or WezTerm with a free prompt or generated item context
 
 See implementation details in [plans/platform/PM-002/README.md](plans/platform/PM-002/README.md).
 
@@ -183,7 +183,7 @@ dataDir: /Users/me/.plan-manager-data
 
 Changing `dataDir` requires a restart.
 
-AI settings contain executable paths and argument templates only. Generated context manifests are private temporary files containing item metadata and repository paths; they expire after 24 hours and are never written into a registered workspace.
+AI settings contain executable paths and argument templates only. Free-prompt sessions open at the workspace root without generated context, allowing manual file and directory references. Brainstorm and implementation sessions use private temporary manifests containing item metadata and repository paths; they expire after 24 hours and are never written into a registered workspace.
 
 ### Data Directory Structure
 

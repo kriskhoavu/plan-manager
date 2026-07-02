@@ -5,6 +5,7 @@
 | #   | Title                          | Expected Result                                                 |
 |-----|--------------------------------|-----------------------------------------------------------------|
 | 1   | Brainstorm a selected item     | AI opens at the workspace root with the item context manifest   |
+| 1a  | Open a free prompt             | AI opens at the workspace root without injected card context    |
 | 2   | Implement a structured item    | Implementation intent is available and included in the manifest |
 | 3   | Incomplete implementation item | Implementation is disabled with missing-document guidance       |
 | 4   | Missing provider or terminal   | Launch is blocked with an actionable capability error           |
@@ -39,6 +40,7 @@ Launch request
 - Detection distinguishes installed, missing, overridden, and invalid tools.
 - Provider authentication remains owned by each CLI.
 - Brainstorming is available for any editable working-tree item.
+- Free prompt is available for any indexed item and creates no context manifest.
 - Implementation requires valid `plan.yaml` and `implementation-plan.md` beneath the item root.
 - Context files use mode `0600`, remain outside Git workspaces, and expire after 24 hours.
 - Launch commands cannot introduce unapproved shell fragments through settings or item values.

@@ -61,7 +61,7 @@ export function AISessionLaunchDialog({ itemId, onClose, onLaunched }: { itemId:
 
   const providers = toolOptions(settings?.providers, capabilities, 'provider');
   const terminals = toolOptions(settings?.terminals, capabilities, 'terminal');
-  const canLaunch = !loading && !launching && eligibility?.editable && providers.some((item) => item.id === provider) && terminals.some((item) => item.id === terminal) && (intent !== 'implement' || eligibility.implementationReady);
+  const canLaunch = !loading && !launching && (intent === 'free_prompt' || eligibility?.editable) && providers.some((item) => item.id === provider) && terminals.some((item) => item.id === terminal) && (intent !== 'implement' || eligibility?.implementationReady);
 
   return (
     <div className="modal-backdrop ai-launch-backdrop" role="presentation">
@@ -72,9 +72,10 @@ export function AISessionLaunchDialog({ itemId, onClose, onLaunched }: { itemId:
         {settings && eligibility && <div className="ai-launch-fields">
           <label>AI provider<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providers.map((item) => <option key={item.id} value={item.id}>{label(item.id)}</option>)}</select></label>
           <label>Terminal<select value={terminal} onChange={(event) => setTerminal(event.target.value)}>{terminals.map((item) => <option key={item.id} value={item.id}>{label(item.id)}</option>)}</select></label>
-          <fieldset><legend>Intent</legend><label><input type="radio" name="ai-intent" checked={intent === 'brainstorm'} onChange={() => setIntent('brainstorm')} /> Brainstorm and refine the card</label><label><input type="radio" name="ai-intent" checked={intent === 'implement'} disabled={!eligibility.implementationReady} aria-describedby="implementation-readiness" onChange={() => setIntent('implement')} /> Implement the structured plan</label></fieldset>
+          <fieldset><legend>Intent</legend><label><input type="radio" name="ai-intent" checked={intent === 'free_prompt'} onChange={() => setIntent('free_prompt')} /> Free prompt — start with the workspace only</label><label><input type="radio" name="ai-intent" checked={intent === 'brainstorm'} onChange={() => setIntent('brainstorm')} /> Brainstorm and refine the card</label><label><input type="radio" name="ai-intent" checked={intent === 'implement'} disabled={!eligibility.implementationReady} aria-describedby="implementation-readiness" onChange={() => setIntent('implement')} /> Implement the structured plan</label></fieldset>
+          {intent === 'free_prompt' && <p className="eligibility-ready">No card context will be injected. The AI opens at the workspace root so you can manually reference any relevant file or directory.</p>}
           <p id="implementation-readiness" className={eligibility.implementationReady ? 'eligibility-ready' : 'eligibility-blocked'}>{eligibility.implementationReady ? 'Implementation ready: plan.yaml and implementation-plan.md are available.' : `Implementation unavailable: ${eligibility.missing.join(', ') || 'required planning files are missing'}.`}</p>
-          {!eligibility.editable && <p className="error">External sessions require an editable working-tree item.</p>}
+          {!eligibility.editable && intent !== 'free_prompt' && <p className="error">Context-based sessions require an editable working-tree item.</p>}
           {(providers.length === 0 || terminals.length === 0) && <p className="error">Enable and detect at least one AI provider and terminal in Settings.</p>}
         </div>}
         <footer className="modal-actions"><button className="ghost" type="button" disabled={launching} onClick={onClose}>Cancel</button><button className="primary" type="button" disabled={!canLaunch} onClick={() => void launch()}>{launching ? 'Opening...' : 'Open session'}</button></footer>

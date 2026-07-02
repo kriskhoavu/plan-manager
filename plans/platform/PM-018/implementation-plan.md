@@ -13,6 +13,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 | F1    | AI Settings                        | Done   |
 | F2    | Item Launch Workflow               | Done   |
 | V1    | Integrated Verification            | Done   |
+| E1    | Free Prompt Enhancement            | Done   |
 
 ## Phase B1: Capability And Settings Foundation
 
@@ -78,3 +79,17 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 **Verification:** `go test ./... && npm run typecheck && npm test -- --run && npm run build && go build ./cmd/plan-manager`
 
 **Commit:** `PM-018: Verify external AI session launch`
+
+## Phase E1: Free Prompt Enhancement
+
+**Deliverables:**
+
+- [x] Add `free_prompt` to backend and frontend launch contracts.
+- [x] Launch the provider at the workspace root without template arguments or a context manifest.
+- [x] Allow free prompt for snapshot items while retaining context-based eligibility rules.
+- [x] Explain manual file and directory references in the launch dialog.
+- [x] Test context omission, snapshot behavior, and frontend submission.
+
+**Verification:** `go test ./internal/application/aisession ./internal/api && npm run typecheck && npm test -- --run web/src/features/ai-session`
+
+**Commit:** `PM-018: Add free prompt AI sessions`

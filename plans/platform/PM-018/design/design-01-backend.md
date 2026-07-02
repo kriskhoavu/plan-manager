@@ -22,6 +22,8 @@ Allowed placeholders are `{workspace}`, `{contextFile}`, `{itemPath}`, `{identif
 
 Built-in provider presets start an interactive session with an initial prompt instructing the provider to read `{contextFile}`. Built-ins never add flags that bypass provider approvals or sandboxing.
 
+For `free_prompt`, the launcher omits all provider template arguments and does not generate a context manifest. The provider starts in the registered workspace root, allowing the user to reference files and directories manually.
+
 ## API Contract
 
 | Method | Endpoint                                 | Request                | Response                     |

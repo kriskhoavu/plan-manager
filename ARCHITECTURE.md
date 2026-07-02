@@ -230,14 +230,14 @@ User edits Markdown or metadata
 ```text
 User opens an item and selects Open AI session
   -> frontend loads detected providers, terminals, and item eligibility
-  -> user selects brainstorm or implement intent
+  -> user selects free prompt, brainstorm, or implement intent
   -> backend validates the indexed item and registered workspace
-  -> backend writes a private context manifest in the app data directory
+  -> brainstorm/implement writes a private context manifest; free prompt omits it
   -> terminal adapter starts the selected AI CLI at the workspace root
   -> audit records identifiers and outcome without prompt content
 ```
 
-AI settings and generated context stay outside registered workspaces. Implementation intent requires an editable working-tree item with valid `plan.yaml` and `implementation-plan.md`. External tools retain their own authentication, approval, and sandbox behavior.
+AI settings and generated context stay outside registered workspaces. Free prompt starts at the workspace root without card context so the user can reference files and directories manually. Implementation intent requires an editable working-tree item with valid `plan.yaml` and `implementation-plan.md`. External tools retain their own authentication, approval, and sandbox behavior.
 
 ### Workspace Explorer
 

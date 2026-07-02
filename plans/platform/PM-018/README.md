@@ -15,7 +15,7 @@ PM-018 lets a user open Claude, Codex, Copilot, or OpenCode for a selected item 
 
 ### Goal
 
-Launch an interactive AI CLI in the correct workspace with validated item context and an explicit brainstorm or implement intent.
+Launch an interactive AI CLI in the correct workspace with a free prompt or validated card context for brainstorming and implementation.
 
 ### Non-Goals
 
@@ -30,7 +30,7 @@ Launch an interactive AI CLI in the correct workspace with validated item contex
 |----------------------|----------------------------------------------------------------------------|
 | AI Provider          | Supported CLI: Claude, Codex, Copilot, or OpenCode                         |
 | Terminal Adapter     | Platform-specific launcher for Terminal, iTerm2, or WezTerm                |
-| Launch Intent        | User-selected `brainstorm` or `implement` behavior                         |
+| Launch Intent        | User-selected `free_prompt`, `brainstorm`, or `implement` behavior         |
 | Context Manifest     | App-owned Markdown file containing item metadata and repository file paths |
 | Launch Template      | Executable and argument list containing approved placeholders              |
 | Implementation Ready | Item with valid `plan.yaml` and `implementation-plan.md`                   |
@@ -51,6 +51,7 @@ Item workspace -> launch dialog -> capability/settings API
 | External terminal first                        | Embedded PTY               | Delivers stable interaction before owning terminal lifecycle      |
 | Generated manifest contains paths, not content | Concatenate every file     | Avoids prompt limits and lets the AI read current repository data |
 | Explicit launch intent                         | Infer from item status     | Prevents accidental implementation                                |
+| Free prompt omits generated context            | Empty context manifest     | Lets users manually reference workspace files and directories     |
 | Argument arrays with approved placeholders     | Arbitrary shell command    | Reduces quoting and command-injection risk                        |
 | App-owned global settings                      | Settings in each workspace | Keeps machine-specific executable paths outside Git               |
 | macOS terminal adapters first                  | Immediate cross-platform   | Matches the current supported distribution channel                |

@@ -157,16 +157,20 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 	if !found {
 		return LaunchResult{}, launchError("workspace_not_found", "workspace not found")
 	}
-	if item.SourceMode == "snapshot" || !item.Editable {
-		return LaunchResult{}, launchError("item_not_editable", "AI sessions require an editable working-tree item")
-	}
-	itemRoot, joinErr := pathguard.SafeJoin(workspace.Path, item.ItemPath)
-	if joinErr != nil {
-		return LaunchResult{}, launchError("item_not_editable", "item path is outside the workspace")
-	}
 	intent := strings.TrimSpace(input.Intent)
-	if intent != "brainstorm" && intent != "implement" {
-		return LaunchResult{}, launchError("invalid_launch_intent", "intent must be brainstorm or implement")
+	if intent != "free_prompt" && intent != "brainstorm" && intent != "implement" {
+		return LaunchResult{}, launchError("invalid_launch_intent", "intent must be free_prompt, brainstorm, or implement")
+	}
+	itemRoot := ""
+	if intent != "free_prompt" {
+		if item.SourceMode == "snapshot" || !item.Editable {
+			return LaunchResult{}, launchError("item_not_editable", "context-based AI sessions require an editable working-tree item")
+		}
+		var joinErr error
+		itemRoot, joinErr = pathguard.SafeJoin(workspace.Path, item.ItemPath)
+		if joinErr != nil {
+			return LaunchResult{}, launchError("item_not_editable", "item path is outside the workspace")
+		}
 	}
 	if intent == "implement" {
 		if readyErr := requireImplementationReady(itemRoot); readyErr != nil {
@@ -193,19 +197,26 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 	if !s.detect(terminal.Executable).Detected {
 		return LaunchResult{}, launchError("terminal_missing", "selected terminal executable was not found")
 	}
-	if cleanupErr := cleanupExpired(s.launch.contextDir, s.launch.now()); cleanupErr != nil {
-		return LaunchResult{}, launchErrorWith("launch_failed", cleanupErr)
-	}
-	manifestPath, manifestErr := writeContextManifest(s.launch.contextDir, workspace, item, itemRoot, intent, s.launch.now())
-	if manifestErr != nil {
-		return LaunchResult{}, launchErrorWith("launch_failed", manifestErr)
+	manifestPath := ""
+	if intent != "free_prompt" {
+		if cleanupErr := cleanupExpired(s.launch.contextDir, s.launch.now()); cleanupErr != nil {
+			return LaunchResult{}, launchErrorWith("launch_failed", cleanupErr)
+		}
+		var manifestErr error
+		manifestPath, manifestErr = writeContextManifest(s.launch.contextDir, workspace, item, itemRoot, intent, s.launch.now())
+		if manifestErr != nil {
+			return LaunchResult{}, launchErrorWith("launch_failed", manifestErr)
+		}
 	}
 	values := map[string]string{
 		"workspace": workspace.Path, "contextFile": manifestPath, "itemPath": itemRoot,
 		"identifier": item.Identifier, "intent": intent,
 	}
 	providerName := expand(provider.Executable, values)
-	providerArgs := expandAll(provider.Args, values)
+	providerArgs := []string{}
+	if intent != "free_prompt" {
+		providerArgs = expandAll(provider.Args, values)
+	}
 	terminalArgs := expandAll(terminal.Args, values)
 	if startErr := s.startTerminal(terminalID, terminal, terminalArgs, workspace.Path, providerName, providerArgs); startErr != nil {
 		return LaunchResult{}, launchErrorWith("launch_failed", startErr)

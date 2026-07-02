@@ -130,7 +130,7 @@ export interface AISessionEligibility {
 export interface AISessionLaunchInput {
   provider: string;
   terminal: string;
-  intent: 'brainstorm' | 'implement';
+  intent: 'free_prompt' | 'brainstorm' | 'implement';
 }
 
 export interface AISessionLaunchResult extends AISessionLaunchInput {

@@ -22,6 +22,7 @@ Add frontend equivalents of `AICapability`, `AISettings`, `LaunchTemplate`, `AIS
 - Settings lists provider and terminal presets with detected state, executable override, argument template, enable toggle, and default selection.
 - Item workspace adds an `Open AI session` action.
 - Dialog requires provider, terminal, and intent.
+- Free prompt explains that no card context is injected and workspace paths can be referenced manually.
 - Implement intent displays eligibility and missing files before submit.
 - Successful launch closes the dialog and shows a transient confirmation.
 - Errors remain in the dialog with backend recovery hints.
@@ -38,4 +39,5 @@ Add frontend equivalents of `AICapability`, `AISettings`, `LaunchTemplate`, `AIS
 |-----------------------------------|--------------------------------------------------------------|
 | Keep launch state local to dialog | No active external session is managed by the browser         |
 | Require explicit intent selection | Makes implementation an informed action                      |
+| Offer a context-free intent       | Supports exploratory sessions without a predefined card task |
 | Put machine settings globally     | Provider and terminal availability is not workspace metadata |

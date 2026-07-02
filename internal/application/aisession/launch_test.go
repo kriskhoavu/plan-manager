@@ -111,6 +111,29 @@ func TestLaunchRejectsSnapshotAndMissingTools(t *testing.T) {
 	}
 }
 
+func TestFreePromptLaunchesWorkspaceWithoutCardContext(t *testing.T) {
+	service, item, workspace, runner, contextDir, _ := launchTestService(t, true)
+	item.SourceMode = "snapshot"
+	item.Editable = false
+	if err := service.launch.index.ReplaceWorkspace(item.WorkspaceID, []models.ItemDetail{item}, nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", Intent: "free_prompt"})
+	if err != nil || !result.Accepted || result.Intent != "free_prompt" {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if len(runner.processes) != 1 {
+		t.Fatalf("processes=%#v", runner.processes)
+	}
+	process := runner.processes[0]
+	if process.dir != workspace.Path || len(process.args) != 5 || process.args[0] != "start" || process.args[4] == "" {
+		t.Fatalf("process=%#v", process)
+	}
+	if _, err := os.Stat(contextDir); !os.IsNotExist(err) {
+		t.Fatalf("free prompt created context directory: %v", err)
+	}
+}
+
 func TestLaunchFailureIsAuditedAsFailed(t *testing.T) {
 	service, item, _, runner, _, auditStore := launchTestService(t, true)
 	runner.err = errors.New("terminal refused launch")
