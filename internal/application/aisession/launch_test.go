@@ -36,14 +36,14 @@ func (r *recordingRunner) Start(name string, args []string, dir string) error {
 func TestLaunchCreatesPrivateManifestAndStartsProviderInWorkspace(t *testing.T) {
 	service, item, workspace, runner, contextDir, auditStore := launchTestService(t, true)
 	eligibility, err := service.Eligibility(item.ID)
-	if err != nil || !eligibility.Editable || !eligibility.ImplementationReady || len(eligibility.Missing) != 0 {
+	if err != nil || !eligibility.Editable || !eligibility.CardContextAvailable || len(eligibility.Missing) != 0 {
 		t.Fatalf("eligibility=%#v err=%v", eligibility, err)
 	}
-	result, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", Intent: "implement"})
+	result, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", ContextMode: "card_context"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.Accepted || result.Intent != "implement" || len(runner.processes) != 1 {
+	if !result.Accepted || result.ContextMode != "card_context" || len(runner.processes) != 1 {
 		t.Fatalf("result=%#v processes=%#v", result, runner.processes)
 	}
 	process := runner.processes[0]
@@ -65,7 +65,7 @@ func TestLaunchCreatesPrivateManifestAndStartsProviderInWorkspace(t *testing.T) 
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "Intent: `implement`") || !strings.Contains(text, filepath.Join(workspace.Path, item.ItemPath, "implementation-plan.md")) {
+	if !strings.Contains(text, "wait for the user's request") || !strings.Contains(text, filepath.Join(workspace.Path, item.ItemPath, "implementation-plan.md")) || strings.Contains(text, "Intent:") {
 		t.Fatalf("manifest = %s", text)
 	}
 	info, err := os.Stat(manifestPath)
@@ -78,22 +78,18 @@ func TestLaunchCreatesPrivateManifestAndStartsProviderInWorkspace(t *testing.T) 
 	}
 }
 
-func TestLaunchRejectsImplementationWithoutStructuredPlan(t *testing.T) {
+func TestCardContextDoesNotRequireStructuredPlan(t *testing.T) {
 	service, item, _, runner, _, auditStore := launchTestService(t, false)
 	eligibility, eligibilityErr := service.Eligibility(item.ID)
-	if eligibilityErr != nil || eligibility.ImplementationReady || len(eligibility.Missing) != 1 {
+	if eligibilityErr != nil || !eligibility.CardContextAvailable || len(eligibility.Missing) != 0 {
 		t.Fatalf("eligibility=%#v err=%v", eligibility, eligibilityErr)
 	}
-	_, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", Intent: "implement"})
-	var launchErr *LaunchError
-	if !errors.As(err, &launchErr) || launchErr.Code != "item_not_implementation_ready" {
-		t.Fatalf("err = %#v", err)
-	}
-	if len(runner.processes) != 0 {
-		t.Fatalf("unexpected processes: %#v", runner.processes)
+	result, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", ContextMode: "card_context"})
+	if err != nil || !result.Accepted || len(runner.processes) != 1 {
+		t.Fatalf("result=%#v processes=%#v err=%v", result, runner.processes, err)
 	}
 	events, _ := auditStore.Recent(10)
-	if len(events) != 1 || events[0].Status != models.AuditStatusBlocked || strings.Contains(events[0].Error, "Read ") {
+	if len(events) != 1 || events[0].Status != models.AuditStatusSuccess {
 		t.Fatalf("events = %#v", events)
 	}
 }
@@ -104,22 +100,22 @@ func TestLaunchRejectsSnapshotAndMissingTools(t *testing.T) {
 	if err := service.launch.index.ReplaceWorkspace(item.WorkspaceID, []models.ItemDetail{item}, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	_, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", Intent: "brainstorm"})
+	_, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", ContextMode: "card_context"})
 	var launchErr *LaunchError
 	if !errors.As(err, &launchErr) || launchErr.Code != "item_not_editable" || len(runner.processes) != 0 {
 		t.Fatalf("err=%#v processes=%#v", err, runner.processes)
 	}
 }
 
-func TestFreePromptLaunchesWorkspaceWithoutCardContext(t *testing.T) {
+func TestWorkspaceOnlyLaunchesWithoutCardContext(t *testing.T) {
 	service, item, workspace, runner, contextDir, _ := launchTestService(t, true)
 	item.SourceMode = "snapshot"
 	item.Editable = false
 	if err := service.launch.index.ReplaceWorkspace(item.WorkspaceID, []models.ItemDetail{item}, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	result, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", Intent: "free_prompt"})
-	if err != nil || !result.Accepted || result.Intent != "free_prompt" {
+	result, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", ContextMode: "workspace_only"})
+	if err != nil || !result.Accepted || result.ContextMode != "workspace_only" {
 		t.Fatalf("result=%#v err=%v", result, err)
 	}
 	if len(runner.processes) != 1 {
@@ -137,7 +133,7 @@ func TestFreePromptLaunchesWorkspaceWithoutCardContext(t *testing.T) {
 func TestLaunchFailureIsAuditedAsFailed(t *testing.T) {
 	service, item, _, runner, _, auditStore := launchTestService(t, true)
 	runner.err = errors.New("terminal refused launch")
-	_, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", Intent: "brainstorm"})
+	_, err := service.Launch(item.ID, LaunchInput{Provider: "test-ai", Terminal: "wezterm", ContextMode: "card_context"})
 	var launchErr *LaunchError
 	if !errors.As(err, &launchErr) || launchErr.Code != "launch_failed" {
 		t.Fatalf("err = %#v", err)
@@ -224,7 +220,7 @@ func launchTestService(t *testing.T, structured bool) (*Service, models.ItemDeta
 	store := aisettings.New(filepath.Join(dataDir, "ai-settings.yaml"))
 	_, err = store.Save(aisettings.Settings{
 		DefaultProvider: "test-ai", DefaultTerminal: "wezterm",
-		Providers: map[string]aisettings.LaunchTemplate{"test-ai": {Enabled: true, Executable: executable, Args: []string{"Read {contextFile}", "{intent}", "{identifier}"}}},
+		Providers: map[string]aisettings.LaunchTemplate{"test-ai": {Enabled: true, Executable: executable, Args: []string{"Read {contextFile}", "{contextMode}", "{identifier}"}}},
 		Terminals: map[string]aisettings.LaunchTemplate{"wezterm": {Enabled: true, Executable: executable}},
 	})
 	if err != nil {

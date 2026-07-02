@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"plan-manager/internal/aisettings"
@@ -78,6 +79,25 @@ func TestSaveRejectsDisabledDefault(t *testing.T) {
 	settings.Providers[settings.DefaultProvider] = template
 	if _, err := service.Save(settings); err == nil {
 		t.Fatal("expected disabled default to fail")
+	}
+}
+
+func TestSettingsMigratesLegacyBehaviorPrompt(t *testing.T) {
+	service := newTestService(t)
+	legacy := aisettings.Settings{
+		DefaultProvider: "codex", DefaultTerminal: "wezterm",
+		Providers: map[string]aisettings.LaunchTemplate{"codex": {Enabled: true, Executable: "codex", Args: []string{"Read {contextFile} and follow its {intent} instructions for {identifier}."}}},
+		Terminals: map[string]aisettings.LaunchTemplate{"wezterm": {Enabled: true, Executable: "wezterm"}},
+	}
+	if _, err := service.store.Save(legacy); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := service.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := settings.Providers["codex"].Args; len(got) != 1 || strings.Contains(got[0], "intent") || !strings.Contains(got[0], "wait for the user's request") {
+		t.Fatalf("migrated args = %#v", got)
 	}
 }
 

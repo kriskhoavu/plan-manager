@@ -230,14 +230,14 @@ User edits Markdown or metadata
 ```text
 User opens an item and selects Open AI session
   -> frontend loads detected providers, terminals, and item eligibility
-  -> user selects free prompt, brainstorm, or implement intent
+  -> user selects workspace-only or selected-card context
   -> backend validates the indexed item and registered workspace
-  -> brainstorm/implement writes a private context manifest; free prompt omits it
+  -> selected-card writes a neutral path manifest; workspace-only omits it
   -> terminal adapter starts the selected AI CLI at the workspace root
   -> audit records identifiers and outcome without prompt content
 ```
 
-AI settings and generated context stay outside registered workspaces. Free prompt starts at the workspace root without card context so the user can reference files and directories manually. Implementation intent requires an editable working-tree item with valid `plan.yaml` and `implementation-plan.md`. External tools retain their own authentication, approval, and sandbox behavior.
+AI settings and generated context stay outside registered workspaces. Workspace-only starts at the workspace root without card context so the user can reference files and directories manually. Selected-card context works for any editable working-tree item, lists only existing card documents, and tells the AI to wait for the user's request. External tools retain their own authentication, approval, and sandbox behavior.
 
 ### Workspace Explorer
 

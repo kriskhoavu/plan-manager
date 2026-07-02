@@ -101,13 +101,13 @@ func TestAILaunchRouteValidatesBodyAndReportsUnavailableLauncher(t *testing.T) {
 	handler := New(nil, nil, nil, nil, nil, nil, nil).WithAISessions(service).Routes()
 
 	invalid := httptest.NewRecorder()
-	handler.ServeHTTP(invalid, httptest.NewRequest(http.MethodPost, "/api/items/item-1/ai-sessions", strings.NewReader(`{"intent":`)))
+	handler.ServeHTTP(invalid, httptest.NewRequest(http.MethodPost, "/api/items/item-1/ai-sessions", strings.NewReader(`{"contextMode":`)))
 	if invalid.Code != http.StatusBadRequest {
 		t.Fatalf("invalid status = %d, body = %s", invalid.Code, invalid.Body.String())
 	}
 
 	unavailable := httptest.NewRecorder()
-	handler.ServeHTTP(unavailable, httptest.NewRequest(http.MethodPost, "/api/items/item-1/ai-sessions", strings.NewReader(`{"provider":"codex","terminal":"terminal","intent":"brainstorm"}`)))
+	handler.ServeHTTP(unavailable, httptest.NewRequest(http.MethodPost, "/api/items/item-1/ai-sessions", strings.NewReader(`{"provider":"codex","terminal":"terminal","contextMode":"card_context"}`)))
 	if unavailable.Code != http.StatusInternalServerError || !strings.Contains(unavailable.Body.String(), `"code":"launch_failed"`) {
 		t.Fatalf("unavailable status = %d, body = %s", unavailable.Code, unavailable.Body.String())
 	}

@@ -11,8 +11,8 @@ Add an `aisession` application service, app-owned settings store, provider adapt
 | `AICapability`          | `id`, `kind`, `detected`, `executable`, `version`, `reason`    |
 | `AISettings`            | `defaultProvider`, `defaultTerminal`, `providers`, `terminals` |
 | `LaunchTemplate`        | `executable`, `args`, `enabled`                                |
-| `AISessionLaunchInput`  | `provider`, `terminal`, `intent`                               |
-| `AISessionLaunchResult` | `accepted`, `provider`, `terminal`, `intent`, `startedAt`      |
+| `AISessionLaunchInput`  | `provider`, `terminal`, `contextMode`                          |
+| `AISessionLaunchResult` | `accepted`, `provider`, `terminal`, `contextMode`, `startedAt` |
 
 Settings are stored in `<data-dir>/ai-settings.yaml`. Context manifests are stored under `<data-dir>/ai-context/` and never under a registered workspace.
 
@@ -22,7 +22,7 @@ Allowed placeholders are `{workspace}`, `{contextFile}`, `{itemPath}`, `{identif
 
 Built-in provider presets start an interactive session with an initial prompt instructing the provider to read `{contextFile}`. Built-ins never add flags that bypass provider approvals or sandboxing.
 
-For `free_prompt`, the launcher omits all provider template arguments and does not generate a context manifest. The provider starts in the registered workspace root, allowing the user to reference files and directories manually.
+For `workspace_only`, the launcher omits all provider template arguments and does not generate a context manifest. For `card_context`, it supplies the selected card and existing related document paths with a neutral instruction to wait for the user's request. Neither mode prescribes brainstorming or implementation.
 
 ## API Contract
 
@@ -38,10 +38,9 @@ For `free_prompt`, the launcher omits all provider template arguments and does n
 
 - Resolve the item and require `sourceMode=working_tree` and `editable=true`.
 - Resolve the canonical workspace root and require the item path to remain beneath it.
-- For implementation intent, parse `plan.yaml` and require `implementation-plan.md` within the item root.
 - Resolve executables without invoking a shell and reject non-executable paths.
 - Write manifests atomically with mode `0600`; remove expired files at startup and before launch.
-- Return stable error codes: `ai_provider_missing`, `terminal_missing`, `invalid_launch_template`, `item_not_editable`, `item_not_implementation_ready`, and `launch_failed`.
+- Return stable error codes: `ai_provider_missing`, `terminal_missing`, `invalid_context_mode`, `invalid_launch_template`, `item_not_editable`, and `launch_failed`.
 - Audit success, blocked, and failed launches without arguments or manifest content.
 
 ## Terminal Adapters

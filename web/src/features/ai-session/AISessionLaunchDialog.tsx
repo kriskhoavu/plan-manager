@@ -9,7 +9,7 @@ export function AISessionLaunchDialog({ itemId, onClose, onLaunched }: { itemId:
   const [eligibility, setEligibility] = useState<AISessionEligibility | null>(null);
   const [provider, setProvider] = useState('');
   const [terminal, setTerminal] = useState('');
-  const [intent, setIntent] = useState<AISessionLaunchInput['intent']>('brainstorm');
+  const [contextMode, setContextMode] = useState<AISessionLaunchInput['contextMode']>('card_context');
   const [loading, setLoading] = useState(true);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState('');
@@ -49,8 +49,8 @@ export function AISessionLaunchDialog({ itemId, onClose, onLaunched }: { itemId:
     setLaunching(true);
     setError('');
     try {
-      const result = await api.launchAISession(itemId, { provider, terminal, intent });
-      onLaunched(`${label(result.provider)} opened in ${label(result.terminal)} for ${result.intent}.`);
+      const result = await api.launchAISession(itemId, { provider, terminal, contextMode });
+      onLaunched(`${label(result.provider)} opened in ${label(result.terminal)} with ${result.contextMode === 'card_context' ? 'card context' : 'workspace context'}.`);
       onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'AI session launch failed.');
@@ -61,7 +61,7 @@ export function AISessionLaunchDialog({ itemId, onClose, onLaunched }: { itemId:
 
   const providers = toolOptions(settings?.providers, capabilities, 'provider');
   const terminals = toolOptions(settings?.terminals, capabilities, 'terminal');
-  const canLaunch = !loading && !launching && (intent === 'free_prompt' || eligibility?.editable) && providers.some((item) => item.id === provider) && terminals.some((item) => item.id === terminal) && (intent !== 'implement' || eligibility?.implementationReady);
+  const canLaunch = !loading && !launching && (contextMode === 'workspace_only' || eligibility?.cardContextAvailable) && providers.some((item) => item.id === provider) && terminals.some((item) => item.id === terminal);
 
   return (
     <div className="modal-backdrop ai-launch-backdrop" role="presentation">
@@ -72,10 +72,10 @@ export function AISessionLaunchDialog({ itemId, onClose, onLaunched }: { itemId:
         {settings && eligibility && <div className="ai-launch-fields">
           <label>AI provider<select value={provider} onChange={(event) => setProvider(event.target.value)}>{providers.map((item) => <option key={item.id} value={item.id}>{label(item.id)}</option>)}</select></label>
           <label>Terminal<select value={terminal} onChange={(event) => setTerminal(event.target.value)}>{terminals.map((item) => <option key={item.id} value={item.id}>{label(item.id)}</option>)}</select></label>
-          <fieldset><legend>Intent</legend><label><input type="radio" name="ai-intent" checked={intent === 'free_prompt'} onChange={() => setIntent('free_prompt')} /> Free prompt — start with the workspace only</label><label><input type="radio" name="ai-intent" checked={intent === 'brainstorm'} onChange={() => setIntent('brainstorm')} /> Brainstorm and refine the card</label><label><input type="radio" name="ai-intent" checked={intent === 'implement'} disabled={!eligibility.implementationReady} aria-describedby="implementation-readiness" onChange={() => setIntent('implement')} /> Implement the structured plan</label></fieldset>
-          {intent === 'free_prompt' && <p className="eligibility-ready">No card context will be injected. The AI opens at the workspace root so you can manually reference any relevant file or directory.</p>}
-          <p id="implementation-readiness" className={eligibility.implementationReady ? 'eligibility-ready' : 'eligibility-blocked'}>{eligibility.implementationReady ? 'Implementation ready: plan.yaml and implementation-plan.md are available.' : `Implementation unavailable: ${eligibility.missing.join(', ') || 'required planning files are missing'}.`}</p>
-          {!eligibility.editable && intent !== 'free_prompt' && <p className="error">Context-based sessions require an editable working-tree item.</p>}
+          <fieldset><legend>Session context</legend><label><input type="radio" name="ai-context" checked={contextMode === 'workspace_only'} onChange={() => setContextMode('workspace_only')} /> Workspace only — start with a free prompt</label><label><input type="radio" name="ai-context" checked={contextMode === 'card_context'} disabled={!eligibility.cardContextAvailable} aria-describedby="card-context-readiness" onChange={() => setContextMode('card_context')} /> Selected card — provide its path and related documents</label></fieldset>
+          {contextMode === 'workspace_only' && <p className="eligibility-ready">No card context will be injected. The AI opens at the workspace root so you can manually reference any relevant file or directory.</p>}
+          <p id="card-context-readiness" className={eligibility.cardContextAvailable ? 'eligibility-ready' : 'eligibility-blocked'}>{eligibility.cardContextAvailable ? 'The selected card path and related document paths will be provided as context. The AI will wait for your request.' : `Card context unavailable: ${eligibility.missing.join(', ') || 'the card is not available in the working tree'}.`}</p>
+          {!eligibility.editable && contextMode !== 'workspace_only' && <p className="error">Card context requires an editable working-tree item.</p>}
           {(providers.length === 0 || terminals.length === 0) && <p className="error">Enable and detect at least one AI provider and terminal in Settings.</p>}
         </div>}
         <footer className="modal-actions"><button className="ghost" type="button" disabled={launching} onClick={onClose}>Cancel</button><button className="primary" type="button" disabled={!canLaunch} onClick={() => void launch()}>{launching ? 'Opening...' : 'Open session'}</button></footer>

@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
 	"plan-manager/internal/aisettings"
 	"plan-manager/internal/audit"
 	"plan-manager/internal/itemindex"
@@ -23,23 +22,23 @@ import (
 const contextRetention = 24 * time.Hour
 
 type LaunchInput struct {
-	Provider string `json:"provider"`
-	Terminal string `json:"terminal"`
-	Intent   string `json:"intent"`
+	Provider    string `json:"provider"`
+	Terminal    string `json:"terminal"`
+	ContextMode string `json:"contextMode"`
 }
 
 type LaunchResult struct {
-	Accepted  bool      `json:"accepted"`
-	Provider  string    `json:"provider"`
-	Terminal  string    `json:"terminal"`
-	Intent    string    `json:"intent"`
-	StartedAt time.Time `json:"startedAt"`
+	Accepted    bool      `json:"accepted"`
+	Provider    string    `json:"provider"`
+	Terminal    string    `json:"terminal"`
+	ContextMode string    `json:"contextMode"`
+	StartedAt   time.Time `json:"startedAt"`
 }
 
 type Eligibility struct {
-	Editable            bool     `json:"editable"`
-	ImplementationReady bool     `json:"implementationReady"`
-	Missing             []string `json:"missing"`
+	Editable             bool     `json:"editable"`
+	CardContextAvailable bool     `json:"cardContextAvailable"`
+	Missing              []string `json:"missing"`
 }
 
 type LaunchError struct {
@@ -100,17 +99,13 @@ func (s *Service) Eligibility(itemID string) (Eligibility, error) {
 		result.Missing = append(result.Missing, "editable working-tree item")
 		return result, nil
 	}
-	itemRoot, err := pathguard.SafeJoin(workspace.Path, item.ItemPath)
+	_, err = pathguard.SafeJoin(workspace.Path, item.ItemPath)
 	if err != nil {
 		result.Editable = false
 		result.Missing = append(result.Missing, "valid item path")
 		return result, nil
 	}
-	if err := requireImplementationReady(itemRoot); err != nil {
-		result.Missing = append(result.Missing, err.Error())
-		return result, nil
-	}
-	result.ImplementationReady = true
+	result.CardContextAvailable = true
 	return result, nil
 }
 
@@ -157,12 +152,12 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 	if !found {
 		return LaunchResult{}, launchError("workspace_not_found", "workspace not found")
 	}
-	intent := strings.TrimSpace(input.Intent)
-	if intent != "free_prompt" && intent != "brainstorm" && intent != "implement" {
-		return LaunchResult{}, launchError("invalid_launch_intent", "intent must be free_prompt, brainstorm, or implement")
+	contextMode := strings.TrimSpace(input.ContextMode)
+	if contextMode != "workspace_only" && contextMode != "card_context" {
+		return LaunchResult{}, launchError("invalid_context_mode", "contextMode must be workspace_only or card_context")
 	}
 	itemRoot := ""
-	if intent != "free_prompt" {
+	if contextMode == "card_context" {
 		if item.SourceMode == "snapshot" || !item.Editable {
 			return LaunchResult{}, launchError("item_not_editable", "context-based AI sessions require an editable working-tree item")
 		}
@@ -170,11 +165,6 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 		itemRoot, joinErr = pathguard.SafeJoin(workspace.Path, item.ItemPath)
 		if joinErr != nil {
 			return LaunchResult{}, launchError("item_not_editable", "item path is outside the workspace")
-		}
-	}
-	if intent == "implement" {
-		if readyErr := requireImplementationReady(itemRoot); readyErr != nil {
-			return LaunchResult{}, launchErrorWith("item_not_implementation_ready", readyErr)
 		}
 	}
 	settings, settingsErr := s.Settings()
@@ -198,30 +188,30 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 		return LaunchResult{}, launchError("terminal_missing", "selected terminal executable was not found")
 	}
 	manifestPath := ""
-	if intent != "free_prompt" {
+	if contextMode == "card_context" {
 		if cleanupErr := cleanupExpired(s.launch.contextDir, s.launch.now()); cleanupErr != nil {
 			return LaunchResult{}, launchErrorWith("launch_failed", cleanupErr)
 		}
 		var manifestErr error
-		manifestPath, manifestErr = writeContextManifest(s.launch.contextDir, workspace, item, itemRoot, intent, s.launch.now())
+		manifestPath, manifestErr = writeContextManifest(s.launch.contextDir, workspace, item, itemRoot, s.launch.now())
 		if manifestErr != nil {
 			return LaunchResult{}, launchErrorWith("launch_failed", manifestErr)
 		}
 	}
 	values := map[string]string{
 		"workspace": workspace.Path, "contextFile": manifestPath, "itemPath": itemRoot,
-		"identifier": item.Identifier, "intent": intent,
+		"identifier": item.Identifier, "contextMode": contextMode, "intent": contextMode,
 	}
 	providerName := expand(provider.Executable, values)
 	providerArgs := []string{}
-	if intent != "free_prompt" {
+	if contextMode == "card_context" {
 		providerArgs = expandAll(provider.Args, values)
 	}
 	terminalArgs := expandAll(terminal.Args, values)
 	if startErr := s.startTerminal(terminalID, terminal, terminalArgs, workspace.Path, providerName, providerArgs); startErr != nil {
 		return LaunchResult{}, launchErrorWith("launch_failed", startErr)
 	}
-	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, Intent: intent, StartedAt: s.launch.now().UTC()}, nil
+	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, ContextMode: contextMode, StartedAt: s.launch.now().UTC()}, nil
 }
 
 func (s *Service) startTerminal(id string, terminal aisettings.LaunchTemplate, terminalArgs []string, workspace, provider string, providerArgs []string) error {
@@ -241,33 +231,15 @@ func (s *Service) startTerminal(id string, terminal aisettings.LaunchTemplate, t
 	return s.launch.runner.Start("/usr/bin/open", []string{"-a", terminalExecutable, wrapper}, workspace)
 }
 
-func requireImplementationReady(itemRoot string) error {
-	metadataPath := filepath.Join(itemRoot, "plan.yaml")
-	data, err := os.ReadFile(metadataPath)
-	if err != nil {
-		return errors.New("implementation requires a readable plan.yaml")
-	}
-	var metadata struct {
-		Plan map[string]any `yaml:"plan"`
-	}
-	if yaml.Unmarshal(data, &metadata) != nil || metadata.Plan == nil {
-		return errors.New("implementation requires a valid plan.yaml with a plan section")
-	}
-	info, err := os.Stat(filepath.Join(itemRoot, "implementation-plan.md"))
-	if err != nil || info.IsDir() {
-		return errors.New("implementation requires implementation-plan.md")
-	}
-	return nil
-}
-
-func writeContextManifest(contextDir string, workspace models.WorkspaceConfig, item models.ItemDetail, itemRoot, intent string, now time.Time) (string, error) {
+func writeContextManifest(contextDir string, workspace models.WorkspaceConfig, item models.ItemDetail, itemRoot string, now time.Time) (string, error) {
 	if err := os.MkdirAll(contextDir, 0o700); err != nil {
 		return "", err
 	}
 	paths := make([]string, 0, len(item.Documents)+2)
 	for _, document := range item.Documents {
 		path, err := pathguard.SafeJoin(itemRoot, document.Path)
-		if err == nil {
+		info, statErr := os.Stat(path)
+		if err == nil && statErr == nil && !info.IsDir() {
 			paths = append(paths, path)
 		}
 	}
@@ -279,12 +251,8 @@ func writeContextManifest(contextDir string, workspace models.WorkspaceConfig, i
 	}
 	paths = unique(paths)
 	var content strings.Builder
-	fmt.Fprintf(&content, "# Plan Manager AI Session\n\n- Intent: `%s`\n- Item: `%s`\n- Workspace: `%s`\n- Item path: `%s`\n\n## Instructions\n\n", intent, item.Identifier, workspace.Path, itemRoot)
-	if intent == "implement" {
-		content.WriteString("Implement the selected item according to its planning documents. Verify each phase before continuing.\n")
-	} else {
-		content.WriteString("Help the user brainstorm and refine the selected item. Do not implement unless the user explicitly changes intent.\n")
-	}
+	fmt.Fprintf(&content, "# Plan Manager AI Session\n\n- Item: `%s`\n- Workspace: `%s`\n- Item path: `%s`\n\n## Instructions\n\n", item.Identifier, workspace.Path, itemRoot)
+	content.WriteString("Use this manifest only to locate the selected card and its related documents. Read them as context, then wait for the user's request.\n")
 	content.WriteString("\n## Documents\n\n")
 	for _, path := range paths {
 		fmt.Fprintf(&content, "- `%s`\n", path)

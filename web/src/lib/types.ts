@@ -123,14 +123,14 @@ export interface AISettings {
 
 export interface AISessionEligibility {
   editable: boolean;
-  implementationReady: boolean;
+  cardContextAvailable: boolean;
   missing: string[];
 }
 
 export interface AISessionLaunchInput {
   provider: string;
   terminal: string;
-  intent: 'free_prompt' | 'brainstorm' | 'implement';
+  contextMode: 'workspace_only' | 'card_context';
 }
 
 export interface AISessionLaunchResult extends AISessionLaunchInput {

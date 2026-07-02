@@ -10,20 +10,20 @@ Add frontend equivalents of `AICapability`, `AISettings`, `LaunchTemplate`, `AIS
 
 ## State Management
 
-| State                      | Owner                  | Behavior                                            |
-|----------------------------|------------------------|-----------------------------------------------------|
-| Capabilities and settings  | AI settings hook       | Load on entry; explicit refresh reruns detection    |
-| Launch selections          | Launch dialog          | Initialize from settings; reset between items       |
-| Implementation eligibility | Item detail/API result | Disable intent and show missing requirements        |
-| Launch request and error   | Launch dialog          | Prevent duplicate submit and show recovery guidance |
+| State                     | Owner                  | Behavior                                            |
+|---------------------------|------------------------|-----------------------------------------------------|
+| Capabilities and settings | AI settings hook       | Load on entry; explicit refresh reruns detection    |
+| Launch selections         | Launch dialog          | Initialize from settings; reset between items       |
+| Card-context availability | Item detail/API result | Disable card context for non-working-tree items     |
+| Launch request and error  | Launch dialog          | Prevent duplicate submit and show recovery guidance |
 
 ## User Interface
 
 - Settings lists provider and terminal presets with detected state, executable override, argument template, enable toggle, and default selection.
 - Item workspace adds an `Open AI session` action.
-- Dialog requires provider, terminal, and intent.
-- Free prompt explains that no card context is injected and workspace paths can be referenced manually.
-- Implement intent displays eligibility and missing files before submit.
+- Dialog requires provider, terminal, and context mode.
+- Workspace-only explains that no card context is injected and workspace paths can be referenced manually.
+- Card context explains that paths are provided without prescribing the AI's task.
 - Successful launch closes the dialog and shows a transient confirmation.
 - Errors remain in the dialog with backend recovery hints.
 
@@ -31,13 +31,13 @@ Add frontend equivalents of `AICapability`, `AISettings`, `LaunchTemplate`, `AIS
 
 - Dialog traps focus, supports Escape, and restores focus to the launch button.
 - Capability state and validation errors use text in addition to color.
-- Disabled implementation intent references visible explanatory text.
+- Disabled card context references visible explanatory text.
 
 ## Design Decisions
 
 | Decision                          | Rationale                                                    |
 |-----------------------------------|--------------------------------------------------------------|
 | Keep launch state local to dialog | No active external session is managed by the browser         |
-| Require explicit intent selection | Makes implementation an informed action                      |
-| Offer a context-free intent       | Supports exploratory sessions without a predefined card task |
+| Select context, not behavior      | The user directs the interactive AI after terminal launch    |
+| Offer workspace-only context      | Supports exploration without a predefined card task          |
 | Put machine settings globally     | Provider and terminal availability is not workspace metadata |

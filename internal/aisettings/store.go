@@ -20,7 +20,7 @@ const (
 var (
 	allowedPlaceholders = map[string]bool{
 		"workspace": true, "contextFile": true, "itemPath": true,
-		"identifier": true, "intent": true,
+		"identifier": true, "contextMode": true, "intent": true,
 	}
 	placeholderPattern = regexp.MustCompile(`\{([^{}]+)\}`)
 )

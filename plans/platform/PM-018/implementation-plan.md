@@ -14,6 +14,7 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 | F2    | Item Launch Workflow               | Done   |
 | V1    | Integrated Verification            | Done   |
 | E1    | Free Prompt Enhancement            | Done   |
+| E2    | Context-Only Session Model         | Done   |
 
 ## Phase B1: Capability And Settings Foundation
 
@@ -59,8 +60,8 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 **Deliverables:**
 
 - [x] Add item action and accessible launch dialog.
-- [x] Add provider, terminal, and intent selection.
-- [x] Display implementation eligibility and recovery guidance.
+- [x] Add provider, terminal, and context selection.
+- [x] Display card-context availability and recovery guidance.
 - [x] Add successful, blocked, missing-tool, and duplicate-submit tests.
 
 **Verification:** `npm run typecheck && npm test -- --run web/src/pages/ItemWorkspacePage.test.ts web/src/features/ai-session`
@@ -84,12 +85,26 @@ Deliver provider detection, secure context generation, macOS external-terminal l
 
 **Deliverables:**
 
-- [x] Add `free_prompt` to backend and frontend launch contracts.
+- [x] Add workspace-only context to backend and frontend launch contracts.
 - [x] Launch the provider at the workspace root without template arguments or a context manifest.
-- [x] Allow free prompt for snapshot items while retaining context-based eligibility rules.
+- [x] Allow workspace-only sessions for snapshot items while retaining card-context eligibility rules.
 - [x] Explain manual file and directory references in the launch dialog.
 - [x] Test context omission, snapshot behavior, and frontend submission.
 
 **Verification:** `go test ./internal/application/aisession ./internal/api && npm run typecheck && npm test -- --run web/src/features/ai-session`
 
 **Commit:** `PM-018: Add free prompt AI sessions`
+
+## Phase E2: Context-Only Session Model
+
+**Deliverables:**
+
+- [x] Replace behavioral intents with `workspace_only` and `card_context`.
+- [x] Remove `plan.yaml` and implementation-plan readiness requirements.
+- [x] Make card manifests neutral and instruct the AI to wait for the user.
+- [x] Include only existing related document paths.
+- [x] Update API, UI, migration behavior, tests, and product documentation.
+
+**Verification:** `go test ./... && npm run typecheck && npm test -- --run`
+
+**Commit:** `PM-018: Simplify AI sessions to context selection`

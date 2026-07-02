@@ -2,22 +2,20 @@
 
 ## Scenario List
 
-| #   | Title                          | Expected Result                                                 |
-|-----|--------------------------------|-----------------------------------------------------------------|
-| 1   | Brainstorm a selected item     | AI opens at the workspace root with the item context manifest   |
-| 1a  | Open a free prompt             | AI opens at the workspace root without injected card context    |
-| 2   | Implement a structured item    | Implementation intent is available and included in the manifest |
-| 3   | Incomplete implementation item | Implementation is disabled with missing-document guidance       |
-| 4   | Missing provider or terminal   | Launch is blocked with an actionable capability error           |
-| 5   | Invalid custom template        | Settings reject unknown placeholders before process execution   |
-| 6   | Snapshot-only item             | Launch is blocked because the session cannot edit that snapshot |
+| #   | Title                        | Expected Result                                                 |
+|-----|------------------------------|-----------------------------------------------------------------|
+| 1   | Open selected-card context   | AI receives the card and existing related document paths        |
+| 2   | Open workspace-only context  | AI opens at the workspace root without injected card context    |
+| 4   | Missing provider or terminal | Launch is blocked with an actionable capability error           |
+| 5   | Invalid custom template      | Settings reject unknown placeholders before process execution   |
+| 6   | Snapshot-only item           | Launch is blocked because the session cannot edit that snapshot |
 
 ## Flow 1: Launch an External Session
 
 ```text
 User selects Open AI session
   -> UI loads detected capabilities and saved settings
-  -> user selects provider, terminal, and intent
+  -> user selects provider, terminal, and context mode
   -> backend resolves the indexed item and registered workspace
   -> backend validates eligibility, executable, and template
   -> backend writes a private context manifest
@@ -29,7 +27,7 @@ User selects Open AI session
 
 ```text
 Launch request
-  -> workspace, item, intent, or template validation fails
+  -> workspace, item, context mode, or template validation fails
   -> no context-dependent process starts
   -> blocked audit event records identifiers but not prompt content
   -> UI displays the recovery hint
@@ -39,8 +37,7 @@ Launch request
 
 - Detection distinguishes installed, missing, overridden, and invalid tools.
 - Provider authentication remains owned by each CLI.
-- Brainstorming is available for any editable working-tree item.
-- Free prompt is available for any indexed item and creates no context manifest.
-- Implementation requires valid `plan.yaml` and `implementation-plan.md` beneath the item root.
+- Card context is available for every editable working-tree item and does not require `plan.yaml`.
+- Workspace-only context is available for any indexed item and creates no context manifest.
 - Context files use mode `0600`, remain outside Git workspaces, and expire after 24 hours.
 - Launch commands cannot introduce unapproved shell fragments through settings or item values.

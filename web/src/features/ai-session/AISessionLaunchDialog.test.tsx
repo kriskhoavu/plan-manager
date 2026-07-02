@@ -7,7 +7,7 @@ vi.mock('../../lib/api', () => ({ api: {
   aiSettings: vi.fn(), aiCapabilities: vi.fn(), aiSessionEligibility: vi.fn(), launchAISession: vi.fn()
 } }));
 
-function mockOptions(implementationReady: boolean) {
+function mockOptions(cardContextAvailable = true) {
   vi.mocked(api.aiSettings).mockResolvedValue({
     defaultProvider: 'codex', defaultTerminal: 'terminal',
     providers: { codex: { enabled: true, executable: 'codex', args: [] } },
@@ -17,60 +17,52 @@ function mockOptions(implementationReady: boolean) {
     { id: 'codex', kind: 'provider', detected: true, configured: true, executable: '/bin/codex' },
     { id: 'terminal', kind: 'terminal', detected: true, configured: true, executable: '/Terminal.app' }
   ]);
-  vi.mocked(api.aiSessionEligibility).mockResolvedValue({ editable: true, implementationReady, missing: implementationReady ? [] : ['implementation-plan.md'] });
+  vi.mocked(api.aiSessionEligibility).mockResolvedValue({ editable: cardContextAvailable, cardContextAvailable, missing: cardContextAvailable ? [] : ['editable working-tree item'] });
 }
 
 describe('AISessionLaunchDialog', () => {
   afterEach(() => vi.clearAllMocks());
 
-  it('disables implementation when the item is not ready and launches brainstorming', async () => {
-    mockOptions(false);
-    vi.mocked(api.launchAISession).mockResolvedValue({ accepted: true, provider: 'codex', terminal: 'terminal', intent: 'brainstorm', startedAt: '2026-07-02T00:00:00Z' });
+  it('provides card context without implementation readiness', async () => {
+    mockOptions();
+    vi.mocked(api.launchAISession).mockResolvedValue({ accepted: true, provider: 'codex', terminal: 'terminal', contextMode: 'card_context', startedAt: '2026-07-02T00:00:00Z' });
     const onClose = vi.fn();
-    const onLaunched = vi.fn();
-    render(<AISessionLaunchDialog itemId="item-1" onClose={onClose} onLaunched={onLaunched} />);
-    expect(await screen.findByText(/implementation unavailable/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/implement the structured plan/i)).toBeDisabled();
+    render(<AISessionLaunchDialog itemId="item-1" onClose={onClose} onLaunched={vi.fn()} />);
+    expect(await screen.findByText(/selected card path and related document paths/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
-    await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', terminal: 'terminal', intent: 'brainstorm' }));
-    expect(onLaunched).toHaveBeenCalledWith(expect.stringContaining('Codex opened'));
+    await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('item-1', { provider: 'codex', terminal: 'terminal', contextMode: 'card_context' }));
     expect(onClose).toHaveBeenCalled();
   });
 
   it('keeps the dialog open and reports launch errors', async () => {
-    mockOptions(true);
+    mockOptions();
     vi.mocked(api.launchAISession).mockRejectedValue(new Error('Terminal missing'));
-    const onClose = vi.fn();
-    render(<AISessionLaunchDialog itemId="item-1" onClose={onClose} onLaunched={vi.fn()} />);
-    await screen.findByText(/implementation ready/i);
+    render(<AISessionLaunchDialog itemId="item-1" onClose={vi.fn()} onLaunched={vi.fn()} />);
+    await screen.findByText(/selected card path/i);
     fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Terminal missing');
-    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('prevents duplicate launch submissions', async () => {
-    mockOptions(true);
-    let resolveLaunch!: (value: { accepted: true; provider: string; terminal: string; intent: 'brainstorm'; startedAt: string }) => void;
+    mockOptions();
+    let resolveLaunch!: (value: { accepted: true; provider: string; terminal: string; contextMode: 'card_context'; startedAt: string }) => void;
     vi.mocked(api.launchAISession).mockReturnValue(new Promise((resolve) => { resolveLaunch = resolve; }));
     render(<AISessionLaunchDialog itemId="item-1" onClose={vi.fn()} onLaunched={vi.fn()} />);
-    await screen.findByText(/implementation ready/i);
-    const button = screen.getByRole('button', { name: 'Open session' });
-    fireEvent.click(button);
+    await screen.findByText(/selected card path/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
     expect(screen.getByRole('button', { name: 'Opening...' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Opening...' }));
     expect(api.launchAISession).toHaveBeenCalledTimes(1);
-    await act(async () => resolveLaunch({ accepted: true, provider: 'codex', terminal: 'terminal', intent: 'brainstorm', startedAt: '2026-07-02T00:00:00Z' }));
+    await act(async () => resolveLaunch({ accepted: true, provider: 'codex', terminal: 'terminal', contextMode: 'card_context', startedAt: '2026-07-02T00:00:00Z' }));
   });
 
-  it('launches a free prompt without requiring editable card context', async () => {
+  it('allows workspace-only sessions when card context is unavailable', async () => {
     mockOptions(false);
-    vi.mocked(api.aiSessionEligibility).mockResolvedValue({ editable: false, implementationReady: false, missing: ['editable working-tree item'] });
-    vi.mocked(api.launchAISession).mockResolvedValue({ accepted: true, provider: 'codex', terminal: 'terminal', intent: 'free_prompt', startedAt: '2026-07-02T00:00:00Z' });
+    vi.mocked(api.launchAISession).mockResolvedValue({ accepted: true, provider: 'codex', terminal: 'terminal', contextMode: 'workspace_only', startedAt: '2026-07-02T00:00:00Z' });
     render(<AISessionLaunchDialog itemId="snapshot" onClose={vi.fn()} onLaunched={vi.fn()} />);
-    const freePrompt = await screen.findByLabelText(/free prompt/i);
-    fireEvent.click(freePrompt);
+    fireEvent.click(await screen.findByLabelText(/workspace only/i));
     expect(screen.getByText(/no card context will be injected/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open session' }));
-    await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('snapshot', { provider: 'codex', terminal: 'terminal', intent: 'free_prompt' }));
+    await waitFor(() => expect(api.launchAISession).toHaveBeenCalledWith('snapshot', { provider: 'codex', terminal: 'terminal', contextMode: 'workspace_only' }));
   });
 });
