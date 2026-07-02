@@ -34,6 +34,7 @@ import type { TreeFileState } from '../features/file-tree/FileStateIcon';
 import { ContentSearchInput, ContentSearchResults } from '../features/content-search/ContentSearch';
 import { useContentSearch } from '../features/content-search/useContentSearch';
 import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
+import { AISessionLaunchControl } from '../features/ai-session/AISessionLaunchControl';
 
 type Tab = 'preview' | 'raw' | 'diff';
 type RightPanelTab = 'info' | 'git';
@@ -67,6 +68,7 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(300);
   const [rightWidth, setRightWidth] = useState(300);
+  const [aiLaunchMessage, setAILaunchMessage] = useState('');
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
 	const [contentSearchIndex, setContentSearchIndex] = useState(0);
@@ -410,8 +412,9 @@ export function ItemWorkspacePage({ itemId, refreshKey, onBack, onContentChanged
           <h1>{plan?.title ?? 'Loading item'}</h1>
           <span>{plan?.scope} / {plan?.branch} / {plan?.identifier}</span>
         </div>
-        <button className="secondary" disabled={gitLoading}><RefreshCw size={16} /> {gitStatus?.dirty ? 'Local changes' : 'Git status'}</button>
+        <div className="workspace-header-actions"><AISessionLaunchControl itemId={itemId} disabled={!plan} onLaunched={setAILaunchMessage} onError={(caught) => showOperationError(caught, 'AI session launch failed')} /><button className="secondary" disabled={gitLoading}><RefreshCw size={16} /> {gitStatus?.dirty ? 'Local changes' : 'Git status'}</button></div>
       </header>
+      {aiLaunchMessage && <div className="operation-notice" role="status">{aiLaunchMessage}</div>}
       <div className="workspace-grid" style={gridStyle} ref={workspaceGridRef}>
         <aside className={leftCollapsed ? 'file-tree side-panel collapsed' : 'file-tree side-panel'}>
           <div className="panel-header">

@@ -35,6 +35,8 @@ Plan Manager addresses that gap by providing:
 - Reopen recently viewed items quickly
 - Use guarded Git flows for commit, fetch, pull, push, branch create/switch
 - Inspect workspace health and recent operation history
+- Detect local Claude, Codex, Copilot, and OpenCode CLIs
+- Launch Terminal, iTerm2, or WezTerm with workspace-only or selected-card context
 
 See implementation details in [plans/platform/PM-002/README.md](plans/platform/PM-002/README.md).
 
@@ -62,6 +64,8 @@ Platform-specific tools used for native folder selection and path reveal:
 - macOS: `osascript`, `open`
 - Windows: PowerShell, Explorer
 - Linux: `zenity` or `kdialog` (picker), `xdg-open` (reveal)
+
+External AI session launch currently supports macOS Terminal, iTerm2, and WezTerm. Install and authenticate at least one supported AI CLI separately. Plan Manager does not bypass the CLI's permission prompts or sandbox.
 
 ## Quick Start
 
@@ -179,6 +183,8 @@ dataDir: /Users/me/.plan-manager-data
 
 Changing `dataDir` requires a restart.
 
+AI settings contain executable paths and argument templates only. Workspace-only sessions open at the workspace root without generated context, allowing manual file and directory references. Selected-card sessions pass the card's workspace-relative path directly to the AI, which can read relevant documents from that directory before waiting for the user's request. No context file or directory is created.
+
 ### Data Directory Structure
 
 ```text
@@ -189,6 +195,7 @@ Changing `dataDir` requires a restart.
   audit-log.jsonl
   saved-filters.yaml
   recent-items.yaml
+  ai-settings.yaml
   clone-root/
 ```
 

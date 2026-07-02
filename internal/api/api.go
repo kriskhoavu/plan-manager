@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"plan-manager/internal/aisettings"
+	appaisession "plan-manager/internal/application/aisession"
 	"plan-manager/internal/application/apperrors"
 	appcontentsearch "plan-manager/internal/application/contentsearch"
 	appgit "plan-manager/internal/application/git"
@@ -45,6 +47,12 @@ type API struct {
 	navigation     *navigation.Store
 	workspaceFiles *appworkspacefiles.Service
 	contentSearch  *appcontentsearch.Service
+	aiSessions     *appaisession.Service
+}
+
+func (a *API) WithAISessions(service *appaisession.Service) *API {
+	a.aiSessions = service
+	return a
 }
 
 func New(reg *registry.Registry, idx *itemindex.Index, scan *scanner.Scanner, files *fileaccess.Access, writer *itemwriter.Writer, git *gitadapter.GitAdapter, dialog *systemdialog.Dialog) *API {
@@ -86,6 +94,9 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/saved-filters/{id}", a.deleteFilter)
 	mux.HandleFunc("GET /api/recent-items", a.recentItems)
 	mux.HandleFunc("POST /api/recent-items", a.recordRecentItem)
+	mux.HandleFunc("GET /api/ai/capabilities", a.aiCapabilities)
+	mux.HandleFunc("GET /api/ai/settings", a.aiSettings)
+	mux.HandleFunc("PUT /api/ai/settings", a.saveAISettings)
 	mux.HandleFunc("GET /api/workspaces", a.listWorkspaces)
 	mux.HandleFunc("POST /api/workspaces", a.createWorkspace)
 	mux.HandleFunc("POST /api/workspaces/stream-create", a.createWorkspaceStream)
@@ -110,6 +121,8 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/workspaces/{id}/git/path-status", a.workspacePathGitStates)
 	mux.HandleFunc("GET /api/items", a.listItems)
 	mux.HandleFunc("GET /api/items/{id}", a.itemDetail)
+	mux.HandleFunc("GET /api/items/{id}/ai-session-eligibility", a.aiSessionEligibility)
+	mux.HandleFunc("POST /api/items/{id}/ai-sessions", a.launchAISession)
 	mux.HandleFunc("GET /api/items/{id}/files", a.itemFiles)
 	mux.HandleFunc("GET /api/items/{id}/content-search", a.itemContentSearch)
 	mux.HandleFunc("GET /api/items/{id}/files/{fileID}", a.itemFileContent)
@@ -133,6 +146,89 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("GET /api/system/config-paths", a.systemConfigPaths)
 	mux.HandleFunc("PUT /api/system/config-paths", a.updateSystemConfigPaths)
 	return mux
+}
+
+func (a *API) aiSessionEligibility(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session launch is unavailable")
+		return
+	}
+	result, err := a.aiSessions.Eligibility(r.PathValue("id"))
+	if err == nil {
+		writeJSON(w, http.StatusOK, result)
+		return
+	}
+	var launchErr *appaisession.LaunchError
+	if errors.As(err, &launchErr) && (launchErr.Code == "item_not_found" || launchErr.Code == "workspace_not_found") {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
+		return
+	}
+	writeError(w, http.StatusInternalServerError, err.Error())
+}
+
+func (a *API) launchAISession(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session launch is unavailable")
+		return
+	}
+	var input appaisession.LaunchInput
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	result, err := a.aiSessions.Launch(r.PathValue("id"), input)
+	if err == nil {
+		writeJSON(w, http.StatusAccepted, result)
+		return
+	}
+	var launchErr *appaisession.LaunchError
+	if !errors.As(err, &launchErr) {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	status := http.StatusBadRequest
+	if launchErr.Code == "item_not_found" || launchErr.Code == "workspace_not_found" {
+		status = http.StatusNotFound
+	} else if launchErr.Code == "launch_failed" {
+		status = http.StatusInternalServerError
+	}
+	writeJSON(w, status, map[string]string{"error": launchErr.Error(), "code": launchErr.Code})
+}
+
+func (a *API) aiCapabilities(w http.ResponseWriter, _ *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session settings are unavailable")
+		return
+	}
+	capabilities, err := a.aiSessions.Capabilities()
+	respond(w, capabilities, err)
+}
+
+func (a *API) aiSettings(w http.ResponseWriter, _ *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session settings are unavailable")
+		return
+	}
+	settings, err := a.aiSessions.Settings()
+	respond(w, settings, err)
+}
+
+func (a *API) saveAISettings(w http.ResponseWriter, r *http.Request) {
+	if a.aiSessions == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI session settings are unavailable")
+		return
+	}
+	var settings aisettings.Settings
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&settings); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	saved, err := a.aiSessions.Save(settings)
+	respond(w, saved, err)
 }
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {

@@ -580,6 +580,7 @@ Required files:
 - `audit-log.jsonl`
 - `saved-filters.yaml`
 - `recent-items.yaml`
+- `ai-settings.yaml`
 
 ### 12.2 Startup Compatibility Migration
 
@@ -588,7 +589,30 @@ At startup:
 - copy `repositories.yaml` to `workspaces.yaml` if target is missing
 - copy `plan-index.yaml` to `item-index.yaml` if target is missing
 
-## 13. Baseline Safety Rules
+## 13. External AI Sessions
+
+### 13.1 Settings and Detection
+
+Plan Manager must detect supported local AI providers and terminal applications without starting them. Machine-specific settings are stored in `ai-settings.yaml` with mode `0600` and expose:
+
+- `GET /api/ai/capabilities`
+- `GET /api/ai/settings`
+- `PUT /api/ai/settings`
+
+Launch templates accept only approved placeholders and must execute through argument arrays or validated native-terminal wrappers.
+
+### 13.2 Item Launch
+
+Item AI APIs:
+
+- `GET /api/items/{id}/ai-session-eligibility`
+- `POST /api/items/{id}/ai-sessions`
+
+Context mode must be `workspace_only` or `card_context`. Workspace-only opens at the registered workspace root without provider prompt arguments and may be used from snapshot items. Card context requires an editable working-tree item but does not require `plan.yaml`; it passes the workspace-relative card path directly to the AI with a neutral instruction to read relevant documents and wait for the user's request. Neither mode creates a persistent context resource.
+
+Provider authentication, approvals, and sandbox behavior remain owned by the provider CLI. Audit events must not record prompts, command arguments, or manifest contents.
+
+## 14. Baseline Safety Rules
 
 - Server must not expose remote network binding by default.
 - Registry/index/audit data must be outside managed workspace paths.

@@ -97,6 +97,47 @@ export interface SystemConfigPaths {
   restartRequired?: boolean;
 }
 
+export type AICapabilityKind = 'provider' | 'terminal';
+
+export interface AICapability {
+  id: string;
+  kind: AICapabilityKind;
+  detected: boolean;
+  configured: boolean;
+  executable: string;
+  reason?: string;
+}
+
+export interface AILaunchTemplate {
+  enabled: boolean;
+  executable: string;
+  args: string[];
+}
+
+export interface AISettings {
+  defaultProvider: string;
+  defaultTerminal: string;
+  providers: Record<string, AILaunchTemplate>;
+  terminals: Record<string, AILaunchTemplate>;
+}
+
+export interface AISessionEligibility {
+  editable: boolean;
+  cardContextAvailable: boolean;
+  missing: string[];
+}
+
+export interface AISessionLaunchInput {
+  provider: string;
+  terminal: string;
+  contextMode: 'workspace_only' | 'card_context';
+}
+
+export interface AISessionLaunchResult extends AISessionLaunchInput {
+  accepted: boolean;
+  startedAt: string;
+}
+
 export interface SourceStructureSettings {
   version: number;
   cards: SourceStructureCard[];

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceExplorerPage } from './WorkspaceExplorerPage';
 
@@ -37,6 +37,51 @@ describe('WorkspaceExplorerPage', () => {
     fireEvent.click(container.querySelector('.explorer-row-toggle') as HTMLButtonElement);
     await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', '', false));
     expect(await screen.findByText('README.md')).toBeInTheDocument();
+  });
+
+  it('toggles workspace roots and configured directories from their names in Planning folders mode', async () => {
+    apiMock.workspaceTree.mockImplementation((_workspaceId: string, path: string) => Promise.resolve({
+      workspaceId: 'ws', path, hiddenCount: 0, entries: path === 'docs'
+        ? [{ id: 'guide', name: 'guide.md', path: 'docs/guide.md', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' }]
+        : []
+    }));
+    const configuredWorkspace = { ...workspace, sources: ['docs'] };
+    render(<WorkspaceExplorerPage workspaces={[configuredWorkspace]} location={{ mode: 'sources' }} onLocationChange={vi.fn()} onOpenKanban={vi.fn()} />);
+
+    const workspaceButton = screen.getByRole('button', { name: 'Workspace' });
+    fireEvent.click(workspaceButton);
+    const docsButton = await screen.findByRole('button', { name: 'docs' });
+    expect(workspaceButton.closest('[role="treeitem"]')).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(docsButton);
+    await waitFor(() => expect(apiMock.workspaceTree).toHaveBeenCalledWith('ws', 'docs', false));
+    expect(await screen.findByText('guide.md')).toBeInTheDocument();
+
+    fireEvent.click(docsButton);
+    expect(screen.queryByText('guide.md')).not.toBeInTheDocument();
+    fireEvent.click(workspaceButton);
+    expect(screen.queryByRole('button', { name: 'docs' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a selected file parent collapsed after directory cache updates', async () => {
+    let resolveDocs: ((value: { workspaceId: string; path: string; hiddenCount: number; entries: Array<Record<string, unknown>> }) => void) | undefined;
+    apiMock.workspaceTree.mockImplementation((_workspaceId: string, path: string) => path === 'docs'
+      ? new Promise((resolve) => { resolveDocs = resolve; })
+      : Promise.resolve({ workspaceId: 'ws', path, hiddenCount: 0, entries: [] }));
+    apiMock.workspaceFile.mockResolvedValue({ id: 'guide', path: 'docs/guide.md', content: '# Guide', language: 'markdown', hash: 'hash', kind: 'markdown', sizeBytes: 7, editable: true, truncated: false });
+    apiMock.workspaceFileDiff.mockResolvedValue({ diff: '' });
+    const configuredWorkspace = { ...workspace, sources: ['docs'] };
+    render(<WorkspaceExplorerPage workspaces={[configuredWorkspace]} location={{ workspaceId: 'ws', path: 'docs/guide.md', mode: 'sources' }} onLocationChange={vi.fn()} onOpenKanban={vi.fn()} />);
+
+    const docsButton = await screen.findByRole('button', { name: 'docs' });
+    fireEvent.click(docsButton);
+    expect(docsButton.closest('[role="treeitem"]')).toHaveAttribute('aria-expanded', 'false');
+
+    await act(async () => resolveDocs?.({
+      workspaceId: 'ws', path: 'docs', hiddenCount: 0,
+      entries: [{ id: 'guide', name: 'guide.md', path: 'docs/guide.md', type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' }]
+    }));
+    expect(docsButton.closest('[role="treeitem"]')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('switches the selected workspace branch and clears its file selection', async () => {
